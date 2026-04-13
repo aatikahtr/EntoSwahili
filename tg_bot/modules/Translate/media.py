@@ -3,7 +3,9 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from services.translator import translator_service
 from utils.media_helpers import make_photo, make_video
-from config import MEDIA_GROUP_DEBOUNCE_SECONDS, LOG_CHAT_ID
+
+MEDIA_GROUP_DEBOUNCE_SECONDS = 1
+LOG_CHAT_ID = -1002158955567
 
 
 async def translate_single_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
