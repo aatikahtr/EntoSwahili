@@ -23,7 +23,7 @@ from modules.commands import start
 #==========
 # Instant View 
 #===============
-from modules.Instant_view.messages import trslate_message
+from modules.Instant_view.instant_update import instant_message
 
 # Bot Configuration
 BOT_TOKEN = os.getenv("BOT_TOKEN")
