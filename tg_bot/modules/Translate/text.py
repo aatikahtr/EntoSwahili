@@ -1,6 +1,6 @@
 from telegram import Update
 from telegram.ext import ContextTypes
-from services.translator import translator_service
+from .translator import translator_service
 
 
 async def translate_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
