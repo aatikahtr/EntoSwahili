@@ -25,21 +25,24 @@ def normalize_domain(url: str) -> str:
     return domain
 
 
-async def instant_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message = update.message
-    if not message or not message.text:
+
+async def instant_view_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    original_message = update.message  # Command message ya user
+    replied = update.message.reply_to_message  # Message iliyo-reply (URL)
+
+    if not replied or not replied.text:
+        await original_message.reply_text("⚠️ Tumia command hii kwa ku-reply message yenye URL.")
         return
 
-    text = message.text.strip()
+    text = replied.text.strip()
 
     if not is_url(text):
-        await message.reply_text("⚠️ Tafadhali tuma URL sahihi.")
+        await original_message.reply_text("⚠️ Message uliyoreply haina URL sahihi.")
         return
 
     try:
         domain = normalize_domain(text)
 
-        # Chagua extractor kulingana na domain
         if domain in NO_MEDIA_DOMAINS:
             title, html = await islam_content(text)
         else:
@@ -51,7 +54,8 @@ async def instant_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             tg_user=update.effective_user,
         )
 
-        await message.reply_text(f"{title}\n{link}")
+        await original_message.reply_text(f"{title}\n{link}")
 
     except Exception as e:
-        await message.reply_text(f"❌ Hitilafu: {e}")
+        await original_message.reply_text(f"❌ Hitilafu: {e}")
+
