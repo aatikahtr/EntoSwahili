@@ -1,6 +1,10 @@
 import re
 from deep_translator import GoogleTranslator
-from config import TRANSLATION_SOURCE, TRANSLATION_TARGET
+
+
+# Translation
+TRANSLATION_SOURCE = "auto"
+TRANSLATION_TARGET = "sw"
 
 
 Kata = re.compile(r"🔗\s*(Telegram|X|WhatsApp|Instagram)")
