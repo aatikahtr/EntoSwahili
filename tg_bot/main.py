@@ -14,7 +14,8 @@ from telegram.ext import (
     filters,
 )
 
-from modules.Translate import start, handle_message
+from modules.Translate import handle_message
+from modules import start
 
 
 
