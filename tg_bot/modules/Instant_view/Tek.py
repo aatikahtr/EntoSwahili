@@ -3,7 +3,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from app.bot.services.url_processor import extract_content, publish_telegraph
+from .url_processor import extract_content, publish_telegraph
 
 logger = logging.getLogger(__name__)
 
