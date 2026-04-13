@@ -1,3 +1,4 @@
+import os
 import asyncio
 import uvicorn
 from starlette.applications import Starlette
@@ -13,10 +14,9 @@ from telegram.ext import (
     filters,
 )
 
-from handlers.commands import start
-from handlers.update import handle_message
+from modules.Translate import start, handle_message
 
-import os
+
 
 # Bot Configuration
 BOT_TOKEN = os.getenv("BOT_TOKEN")
