@@ -1,10 +1,11 @@
 from telegram import Update
 from telegram.ext import ContextTypes
-from config import LOG_CHAT_ID
-from handlers.media import (
+from .media import (
     handle_media_group,
     translate_single_media
 )
+
+LOG_CHAT_ID = -1002158955567
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -21,7 +22,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Kama ni maandishi
         if message.text:
-            from handlers.text import translate_text
+            from .text import translate_text
             await translate_text(update, context)
             return
 
