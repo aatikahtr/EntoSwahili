@@ -27,8 +27,8 @@ def normalize_domain(url: str) -> str:
 
 
 async def instant_view_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    original_message = update.message  # Command message ya user
-    replied = update.message.reply_to_message  # Message iliyo-reply (URL)
+    original_message = update.message
+    replied = update.message.reply_to_message
 
     if not replied or not replied.text:
         await original_message.reply_text("⚠️ Tumia command hii kwa ku-reply message yenye URL.")
@@ -36,17 +36,25 @@ async def instant_view_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
     text = replied.text.strip()
 
-    if not is_url(text):
-        await original_message.reply_text("⚠️ Message uliyoreply haina URL sahihi.")
-        return
+    # Kagua kama ni URL moja kwa moja, au tafuta ndani ya text
+    if is_url(text):
+        url = text
+    else:
+        match = re.search(r'https?://\S+', text)
+        if not match:
+            await original_message.reply_text(
+                f"⚠️ Sijapata URL kwenye message uliyoreply:\n\n{text[:200]}"
+            )
+            return
+        url = match.group(0)
 
     try:
-        domain = normalize_domain(text)
+        domain = normalize_domain(url)
 
         if domain in NO_MEDIA_DOMAINS:
-            title, html = await islam_content(text)
+            title, html = await islam_content(url)
         else:
-            title, html = await extract_content(text)
+            title, html = await extract_content(url)
 
         link = await create_instant_view(
             title=title,
@@ -58,4 +66,5 @@ async def instant_view_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
     except Exception as e:
         await original_message.reply_text(f"❌ Hitilafu: {e}")
+
 
