@@ -1,8 +1,8 @@
 import os
 from telegraph.aio import Telegraph
 
-from app.bot.services.users import get_user_profile
-from app.bot.services.html_paginator import paginate_html
+from .services.users import get_user_profile
+from html_paginator import paginate_html
 
 ACCESS_TOKEN = os.getenv("INSTANT_TOKEN")
 telegraph = Telegraph(access_token=ACCESS_TOKEN)
