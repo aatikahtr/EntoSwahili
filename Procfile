@@ -1,1 +1,1 @@
-web: python main.py
+web: python tg_bot/main.py
