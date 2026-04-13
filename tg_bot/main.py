@@ -60,7 +60,7 @@ async def main():
                 filters.ChatType.GROUP |
                 filters.ChatType.SUPERGROUP
             ),
-            handle_message
+            trslate_message
         )
     )
 
