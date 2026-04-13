@@ -13,9 +13,16 @@ from telegram.ext import (
     filters,
 )
 
-from config import BOT_TOKEN, URL, PORT
 from handlers.commands import start
 from handlers.update import handle_message
+
+import os
+
+# Bot Configuration
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+URL = os.getenv("URL")
+PORT = int(os.getenv("PORT", 10000))
+
 
 
 # Global application instance
