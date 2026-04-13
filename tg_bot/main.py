@@ -14,10 +14,16 @@ from telegram.ext import (
     filters,
 )
 
+#===========
+# Translate
+#===========
 from modules.Translate.update import handle_message
 from modules.commands import start
 
-
+#==========
+# Instant View 
+#===============
+from modules.Instant_view.messages import handle_message
 
 # Bot Configuration
 BOT_TOKEN = os.getenv("BOT_TOKEN")
