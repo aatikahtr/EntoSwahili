@@ -17,7 +17,7 @@ from telegram.ext import (
 #===========
 # Translate
 #===========
-from modules.Translate.trslate_update import handle_message
+from modules.Translate.trslate_update import trslate_message
 from modules.commands import start
 
 #==========
@@ -52,6 +52,7 @@ async def main():
 
     # Register handlers
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("tr", instant_view_command))
     app.add_handler(
         MessageHandler(
             filters.ALL & (
