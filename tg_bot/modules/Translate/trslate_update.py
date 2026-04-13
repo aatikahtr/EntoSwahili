@@ -8,7 +8,7 @@ from .media import (
 LOG_CHAT_ID = -1002158955567
 
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def trslate_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Main message router (hupokea updates zote)"""
     try:
         message = update.effective_message
