@@ -25,7 +25,7 @@ def normalize_domain(url: str) -> str:
     return domain
 
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def instant_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     if not message or not message.text:
         return
