@@ -1,7 +1,7 @@
 import os
 from telegraph.aio import Telegraph
 
-from .services.users import get_user_profile
+from .users import get_user_profile
 from .html_paginator import paginate_html
 
 ACCESS_TOKEN = os.getenv("INSTANT_TOKEN")
