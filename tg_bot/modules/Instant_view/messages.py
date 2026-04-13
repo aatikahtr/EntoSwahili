@@ -2,9 +2,9 @@ from urllib.parse import urlparse
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from app.bot.services.url_processor import extract_content
-from app.bot.services.Islamic_url import islam_content
-from app.bot.services.instant_view import create_instant_view
+from .url_processor import extract_content
+from .Islamic_url import islam_content
+from .instant_view import create_instant_view
 
 
 # Domains ambazo HAZIRUHUSIWI picha
