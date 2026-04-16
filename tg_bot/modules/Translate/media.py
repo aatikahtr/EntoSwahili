@@ -21,6 +21,9 @@ async def translate_single_media(update: Update, context: ContextTypes.DEFAULT_T
     if not translator_service.should_translate(msg.caption, translated):
         return
 
+    
+    translated = translated[:1024]
+
     # Reply with appropriate media type
     if msg.photo:
         await msg.reply_photo(
@@ -42,14 +45,14 @@ async def translate_single_media(update: Update, context: ContextTypes.DEFAULT_T
             caption=translated,
             message_thread_id=msg.message_thread_id
         )
-        
+
     elif msg.document:
         await msg.reply_document(
             msg.document.file_id,
             caption=translated,
             message_thread_id=msg.message_thread_id
         )
-        
+
     elif msg.audio:
         await msg.reply_audio(
             msg.audio.file_id,
@@ -146,5 +149,4 @@ async def send_media_group(context: ContextTypes.DEFAULT_TYPE):
         finally:
             media_groups.pop(group_id, None)
             captions.pop(group_id, None)
-
 
