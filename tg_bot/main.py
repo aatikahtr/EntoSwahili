@@ -25,6 +25,15 @@ from modules.commands import start
 #===============
 from modules.Instant_view.instant_command import instant_view_command
 
+
+#=========
+# Moja moja
+#==========
+from models.mojamoja.moja1 import mojaone
+
+
+
+
 # Bot Configuration
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 URL = os.getenv("URL")
