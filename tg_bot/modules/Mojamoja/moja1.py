@@ -55,8 +55,14 @@ M_Update = -1002012849938
 # Islamic rs 🔁 👇
 Islamic_rs = -1003298737378
 # Islamic 📰 ⬇️ 👇
-Islamic_news = -1003778143477
+Islamic_news   = -1003778143477
+Islamic_news_2 = -1003910568186
 
+# Channels zote za Islamic (round-robin)
+islamic_targets = [Islamic_news, Islamic_news_2]
+
+# Counter ya round-robin kwa kila source chat
+islamic_round_robin = {}  # chat_id -> index
 
 
 # =====================
@@ -92,8 +98,13 @@ async def process_queue(chat_id: int, context: ContextTypes.DEFAULT_TYPE):
         # =====================
         if chat_id == rs_Update:
             send_chat_id = M_Update
+
         elif chat_id == Islamic_rs:
-            send_chat_id = Islamic_news
+            # Round-robin kati ya Islamic_news na Islamic_news_2
+            idx = islamic_round_robin.get(chat_id, 0)
+            send_chat_id = islamic_targets[idx]
+            islamic_round_robin[chat_id] = (idx + 1) % len(islamic_targets)
+
         else:
             continue
 
