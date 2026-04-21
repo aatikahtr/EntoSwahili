@@ -29,7 +29,7 @@ from modules.Instant_view.instant_command import instant_view_command
 #=========
 # Moja moja
 #==========
-from models.mojamoja.moja1 import mojaone
+from modules.mojamoja.moja1 import mojaone
 
 
 
