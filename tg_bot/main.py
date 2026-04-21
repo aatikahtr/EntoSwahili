@@ -73,6 +73,16 @@ async def main():
         )
     )
 
+    
+    app.add_handler(
+    MessageHandler(
+        filters.ChatType.CHANNEL &
+        (filters.TEXT | filters.PHOTO | filters.VIDEO),
+        mojaone
+    )
+    )
+    
+    
     # Setup webhook server
     starlette_app = Starlette(
         routes=[Route("/telegram", telegram_webhook, methods=["POST"])]
