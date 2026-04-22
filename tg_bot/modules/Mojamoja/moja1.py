@@ -65,6 +65,19 @@ islamic_targets = [Islamic_news, Islamic_news_2]
 islamic_round_robin = {}  # chat_id -> index
 
 
+# ==============================
+# Habari Tz rs 🔄
+Rsnews = -1002484801073  # Rs Habari 🔁
+
+# Videos Download ⬇️
+News1 = -1002480315794  # Quality
+News2 = -1003940062340
+News3 = -1003558617128
+
+Habaritz_targets = [News1, News2, News3]
+Habaritz_round_robin = {}  # chat_id -> index
+
+
 # =====================
 # EXTRACT VALID URLS
 # =====================
@@ -105,6 +118,12 @@ async def process_queue(chat_id: int, context: ContextTypes.DEFAULT_TYPE):
             send_chat_id = islamic_targets[idx]
             islamic_round_robin[chat_id] = (idx + 1) % len(islamic_targets)
 
+        elif chat_id == Rsnews:
+            # Round-robin kati ya News1, News2, News3
+            idx = Habaritz_round_robin.get(chat_id, 0)
+            send_chat_id = Habaritz_targets[idx]
+            Habaritz_round_robin[chat_id] = (idx + 1) % len(Habaritz_targets)
+
         else:
             continue
 
@@ -133,8 +152,8 @@ async def mojaone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     chat_id = message.chat.id
-    
-    text = message.text or  ""
+
+    text = message.text or ""
     if not text:
         return
 
