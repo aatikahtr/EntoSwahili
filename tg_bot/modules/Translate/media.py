@@ -1,5 +1,5 @@
 from html import escape
-from telegram import Update
+from telegram import Update, Message
 from telegram.ext import ContextTypes
 from .translator import translator_service
 from .media_helpers import make_photo, make_video
@@ -8,9 +8,14 @@ MEDIA_GROUP_DEBOUNCE_SECONDS = 1
 LOG_CHAT_ID = -1002158955567
 
 
-async def translate_single_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def translate_single_media(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    target: Message = None
+):
     """Handle single photo/video with caption"""
-    msg = update.message
+    # target = reply_to_message au message ya kawaida
+    msg = target or update.message
 
     if not msg.caption:
         return
@@ -21,49 +26,51 @@ async def translate_single_media(update: Update, context: ContextTypes.DEFAULT_T
     if not translator_service.should_translate(msg.caption, translated):
         return
 
-    
     translated = translated[:1024]
 
-    # Reply with appropriate media type
+    # Jibu kwenye ujumbe wa mtumiaji (si target)
+    reply_to = update.effective_message
+
     if msg.photo:
-        await msg.reply_photo(
+        await reply_to.reply_photo(
             msg.photo[-1].file_id,
             caption=translated,
             message_thread_id=msg.message_thread_id
         )
-
     elif msg.video:
-        await msg.reply_video(
+        await reply_to.reply_video(
             msg.video.file_id,
             caption=translated,
             message_thread_id=msg.message_thread_id
         )
-
     elif msg.animation:
-        await msg.reply_animation(
+        await reply_to.reply_animation(
             msg.animation.file_id,
             caption=translated,
             message_thread_id=msg.message_thread_id
         )
-
     elif msg.document:
-        await msg.reply_document(
+        await reply_to.reply_document(
             msg.document.file_id,
             caption=translated,
             message_thread_id=msg.message_thread_id
         )
-
     elif msg.audio:
-        await msg.reply_audio(
+        await reply_to.reply_audio(
             msg.audio.file_id,
             caption=translated,
             message_thread_id=msg.message_thread_id
         )
 
 
-async def handle_media_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_media_group(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    target: Message = None
+):
     """Collect media group items and schedule sending"""
-    msg = update.effective_message
+    # target = reply_to_message au message ya kawaida
+    msg = target or update.effective_message
     group_id = msg.media_group_id
 
     bot_data = context.application.bot_data
@@ -117,7 +124,7 @@ async def handle_media_group(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def send_media_group(context: ContextTypes.DEFAULT_TYPE):
-    """Send collected media group"""
+    """Send collected media group - haibadiliki"""
     data = context.job.data
     chat_id = data["chat_id"]
     group_id = data["group_id"]
@@ -127,13 +134,11 @@ async def send_media_group(context: ContextTypes.DEFAULT_TYPE):
     media_groups = bot_data.get("media_groups", {})
     captions = bot_data.get("media_captions", {})
 
-    # Skip if no translation needed
     if captions.get(group_id) is None:
         media_groups.pop(group_id, None)
         captions.pop(group_id, None)
         return
 
-    # Send media group
     if group_id in media_groups:
         try:
             await context.bot.send_media_group(
@@ -149,4 +154,3 @@ async def send_media_group(context: ContextTypes.DEFAULT_TYPE):
         finally:
             media_groups.pop(group_id, None)
             captions.pop(group_id, None)
-
