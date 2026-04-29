@@ -32,14 +32,13 @@ from modules.Instant_view.instant_command import instant_view_command
 from modules.Mojamoja.moja1 import mojaone
 
 
-
-
 # Bot Configuration
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 URL = os.getenv("URL")
 PORT = int(os.getenv("PORT", 10000))
 
-
+# Groups zinazoruhusiwa
+ALLOWED_GROUPS = [-1001668363178, -1001669440207]
 
 # Global application instance
 app = None
@@ -61,27 +60,36 @@ async def main():
 
     # Register handlers
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("tr", instant_view_command))
+    app.add_handler(CommandHandler("view", instant_view_command))
+
+    # PRIVATE: command /tr + reply pekee
+    app.add_handler(
+        CommandHandler(
+            "tr",
+            trslate_message,
+            filters=filters.ChatType.PRIVATE
+        )
+    )
+
+    # GROUP/SUPERGROUP: MessageHandler + filter ya group IDs zilizoruhusiwa
+    allowed_chats = filters.Chat(chat_id=ALLOWED_GROUPS)
     app.add_handler(
         MessageHandler(
-            filters.ALL & (
-                filters.ChatType.PRIVATE |
-                filters.ChatType.GROUP |
-                filters.ChatType.SUPERGROUP
-            ),
+            (filters.ChatType.GROUP | filters.ChatType.SUPERGROUP) &
+            allowed_chats &
+            (filters.TEXT | filters.PHOTO | filters.VIDEO | filters.Document.ALL | filters.AUDIO | filters.ANIMATION),
             trslate_message
         )
     )
 
-    
+    # CHANNEL handler
     app.add_handler(
-    MessageHandler(
-        filters.ChatType.CHANNEL &
-        (filters.TEXT | filters.PHOTO | filters.VIDEO),
-        mojaone
+        MessageHandler(
+            filters.ChatType.CHANNEL &
+            (filters.TEXT | filters.PHOTO | filters.VIDEO),
+            mojaone
+        )
     )
-    )
-    
     
     # Setup webhook server
     starlette_app = Starlette(
