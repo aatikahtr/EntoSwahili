@@ -1,11 +1,16 @@
-from telegram import Update
+from telegram import Update, Message
 from telegram.ext import ContextTypes
 from .translator import translator_service
 
 
-async def translate_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def translate_text(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    target: Message = None
+):
     """Translate text messages"""
-    msg = update.message
+    # target = reply_to_message au message ya kawaida
+    msg = target or update.message
     text = msg.text
 
     # Skip commands
@@ -19,7 +24,10 @@ async def translate_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not translator_service.should_translate(text, translated):
         return
 
-    await msg.reply_text(
+    # Jibu kwenye ujumbe wa mtumiaji (si target)
+    reply_to = update.effective_message
+
+    await reply_to.reply_text(
         translated,
         message_thread_id=msg.message_thread_id
     )
