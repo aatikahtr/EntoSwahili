@@ -1,7 +1,16 @@
+import requests
+from bs4 import BeautifulSoup
+from telegram import Update
+from telegram.ext import ContextTypes
+
+
+def is_url(text: str) -> bool:
+    return text.startswith("http://") or text.startswith("https://")
+
+
 async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     original_message = update.message
 
-    # Kagua kama URL imetolewa
     if not context.args:
         await original_message.reply_text("⚠️ Toa URL. Mfano: /get https://example.com")
         return
@@ -13,9 +22,6 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        import requests
-        from bs4 import BeautifulSoup
-
         headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
@@ -40,10 +46,8 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await original_message.reply_text("⚠️ Imeshindwa kupata content.")
             return
 
-        # Tuma title na content
         full_text = f"<b>{title}</b>\n\n{content}"
 
-        # Telegram ina limit ya 4096 characters
         if len(full_text) > 4096:
             full_text = full_text[:4090] + "..."
 
