@@ -21,13 +21,20 @@ async def get_session() -> aiohttp.ClientSession:
     return _aiohttp_session
 
 
+async def close_session():
+    global _aiohttp_session
+    if _aiohttp_session and not _aiohttp_session.closed:
+        await _aiohttp_session.close()
+        _aiohttp_session = None
+
+
 # ======================
 # SANITIZER
 # ======================
 ALLOWED_TAGS = {
     "p", "a", "b", "strong", "i", "em", "u",
     "s", "blockquote", "code", "pre",
-    "ul", "ol", "li", "br"
+    "ul", "ol", "li", "br", "h2", "h3"
 }
 ALLOWED_ATTRS = {"a": ["href", "title", "target", "rel"]}
 
@@ -90,7 +97,7 @@ def kata(title: str, blocks: list[Tag], base_url: str) -> tuple[str, str]:
     for block in blocks:
         text = block.get_text(" ", strip=True).lower()
 
-        # Kata content ukikutana na stop words (kwa text tu)
+        # Kata content ukikutana na stop words
         if text and any(w in text for w in STOP_WORDS):
             break
 
@@ -100,7 +107,7 @@ def kata(title: str, blocks: list[Tag], base_url: str) -> tuple[str, str]:
 
 
 # ======================
-# CORE FUNCTION (FINAL)
+# CORE FUNCTION
 # ======================
 async def extract_content(
     url: str,
@@ -116,7 +123,14 @@ async def extract_content(
     soup = BeautifulSoup(html, "html.parser")
 
     # ===== TITLE =====
-    title = soup.title.string.strip() if soup.title else "Hakuna title"
+    # Jaribu og:title kwanza — ni sahihi zaidi
+    og_title = soup.find("meta", property="og:title")
+    if og_title and og_title.get("content"):
+        title = og_title["content"].strip()
+    elif soup.title:
+        title = soup.title.string.strip()
+    else:
+        title = "Hakuna title"
 
     # ===== ARTICLE ROOT =====
     article = (
@@ -140,8 +154,7 @@ async def extract_content(
         ["p", "li", "blockquote", "h2", "h3", "figure", "img"],
         recursive=True
     ):
-
-        # MEDIA (IMG / FIGURE) → ruhusu zote
+        # MEDIA → ruhusu zote
         if el.name in {"img", "figure"}:
             blocks.append(el)
             continue
@@ -155,7 +168,7 @@ async def extract_content(
         if not text:
             continue
 
-        # Skip noise fupi sana
+        # Skip noise fupi — isipokuwa vichwa
         if el.name in {"p", "li", "blockquote"} and len(text) < 30:
             continue
 
@@ -166,7 +179,7 @@ async def extract_content(
         seen_texts.add(text)
         blocks.append(el)
 
-    # ===== CUT CONTENT (SOMA ZAIDI) =====
+    # ===== CUT CONTENT =====
     title, html_content = kata(title, blocks, url)
 
     return title, html_content[:MAX_HTML_LENGTH]
