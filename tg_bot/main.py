@@ -14,6 +14,7 @@ from telegram.ext import (
     filters,
 )
 
+from .Jlb import get_command
 #===========
 # Translate
 #===========
