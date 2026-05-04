@@ -3,6 +3,14 @@ from bs4 import BeautifulSoup
 from telegram import Update
 from telegram.ext import ContextTypes
 
+NOISE_TEXTS = {
+    "table of contents",
+    "sign in with google to post a comment",
+    "no comments yet. be the first!",
+    "write a comment",
+    "post comment",
+}
+
 
 def is_url(text: str) -> bool:
     return text.startswith("http://") or text.startswith("https://")
@@ -37,7 +45,7 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines = []
         for p in paragraphs:
             text = p.text.strip()
-            if text:
+            if text and text.lower() not in NOISE_TEXTS:
                 lines.append(text)
 
         content = "\n\n".join(lines)
