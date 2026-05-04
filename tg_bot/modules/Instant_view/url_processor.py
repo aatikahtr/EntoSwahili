@@ -1,7 +1,9 @@
+import os
 import aiohttp
 from html import escape
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup, Tag, NavigableString
+from telegraph.aio import Telegraph
 
 MAX_HTML_LENGTH = 60000
 
@@ -105,11 +107,43 @@ def kata(title: str, blocks: list[Tag], base_url: str) -> tuple[str, str]:
 
 
 # ======================
+# PUBLISH TELEGRAPH
+# ======================
+async def publish_telegraph(
+    title: str,
+    html: str,
+    author_name: str,
+    author_url: str,
+) -> str:
+    telegraph = Telegraph(access_token=os.getenv("INSTANT_TOKEN"))
+    response = await telegraph.create_page(
+        title=title[:64],
+        html_content=html,
+        author_name=author_name,
+        author_url=author_url,
+    )
+    path = response["path"]
+
+    # Rekebisha title kamili kama ilikatwa
+    if len(title) > 64:
+        await telegraph.edit_page(
+            path=path,
+            title=title,
+            html_content=html,
+            author_name=author_name,
+            author_url=author_url,
+        )
+
+    return f"https://telegra.ph/{path}"
+
+
+# ======================
 # CORE FUNCTION
 # ======================
 async def extract_content(
     url: str,
     allow_media: bool = True,
+    cut_content: bool = True,
 ) -> tuple[str, str]:
 
     session = await get_session()
@@ -186,6 +220,10 @@ async def extract_content(
         blocks.append(el)
 
     # ===== CUT CONTENT =====
-    title, html_content = kata(title, blocks, url)
+    if cut_content:
+        title, html_content = kata(title, blocks, url)
+    else:
+        title = title.split("|")[0].strip()
+        html_content = "".join(sanitize(b, url, allow_media) for b in blocks)
 
     return title, html_content[:MAX_HTML_LENGTH]
