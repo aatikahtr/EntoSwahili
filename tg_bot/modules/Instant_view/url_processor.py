@@ -90,14 +90,12 @@ def kata(title: str, blocks: list[Tag], base_url: str) -> tuple[str, str]:
         "continue reading",
     }
 
-    # Safisha title
     title = title.split("|")[0].strip()
     parts = []
 
     for block in blocks:
         text = block.get_text(" ", strip=True).lower()
 
-        # Kata content ukikutana na stop words
         if text and any(w in text for w in STOP_WORDS):
             break
 
@@ -123,7 +121,6 @@ async def extract_content(
     soup = BeautifulSoup(html, "html.parser")
 
     # ===== TITLE =====
-    # Jaribu og:title kwanza — ni sahihi zaidi
     og_title = soup.find("meta", property="og:title")
     if og_title and og_title.get("content"):
         title = og_title["content"].strip()
@@ -136,6 +133,15 @@ async def extract_content(
     article = (
         soup.find("article")
         or soup.find("main")
+        or soup.find("div", class_=lambda c: c and any(
+            x in c for x in [
+                "post-content",
+                "entry-content",
+                "article-content",
+                "content-area",
+                "single-post",
+            ]
+        ))
         or soup.body
     )
 
