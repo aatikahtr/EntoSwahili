@@ -71,6 +71,14 @@ async def main():
         )
     )
 
+    app.add_handler(
+        CommandHandler(
+            "get",
+            get_command,
+            filters=filters.ChatType.PRIVATE
+        )
+    )
+    
     # GROUP/SUPERGROUP: MessageHandler + filter ya group IDs zilizoruhusiwa
     allowed_chats = filters.Chat(chat_id=ALLOWED_GROUPS)
     app.add_handler(
