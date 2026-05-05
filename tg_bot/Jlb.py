@@ -12,11 +12,14 @@ NOISE_TEXTS = {
     "post comment",
 }
 
-telegraph = Telegraph(access_token="522e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc")
+telegraph = Telegraph(access_token="YOUR_ACCESS_TOKEN")
 
-# Tags zinazoruhusiwa na Telegraph
-ALLOWED_TAGS = {"b", "strong", "i", "em", "u", "s", "a", "img", "p", "br",
-                "h3", "h4", "ul", "ol", "li", "blockquote", "pre", "code", "figure", "figcaption"}
+# Tags zinazoruhusiwa na Telegraph (picha zimeondolewa)
+ALLOWED_TAGS = {
+    "b", "strong", "i", "em", "u", "s", "a",
+    "p", "br", "h3", "h4", "ul", "ol", "li",
+    "blockquote", "pre", "code"
+}
 
 
 def is_url(text: str) -> bool:
@@ -24,7 +27,7 @@ def is_url(text: str) -> bool:
 
 
 def clean_node(tag) -> str:
-    """Badilisha BeautifulSoup node kuwa HTML safi inayokubalika na Telegraph."""
+    """Badilisha BeautifulSoup node kuwa HTML safi inayokubalika na Telegraph bila picha."""
     from bs4 import NavigableString, Tag
 
     if isinstance(tag, NavigableString):
@@ -35,16 +38,11 @@ def clean_node(tag) -> str:
 
     name = tag.name.lower() if tag.name else ""
 
-    # Ruka tags zisizohusika
-    if name in {"script", "style", "nav", "footer", "aside", "form", "button", "input"}:
-        return ""
-
-    # Picha
-    if name == "img":
-        src = tag.get("src", "")
-        alt = tag.get("alt", "")
-        if src and src.startswith("http"):
-            return f'<img src="{src}" alt="{alt}"/>'
+    # Ruka tags zisizohusika pamoja na picha
+    if name in {
+        "script", "style", "nav", "footer", "aside",
+        "form", "button", "input", "img", "figure", "figcaption"
+    }:
         return ""
 
     # Link
@@ -61,29 +59,33 @@ def clean_node(tag) -> str:
     if not inner.strip():
         return ""
 
-    # Map tags za HTML kwenda zinazoruhusiwa na Telegraph
+    # Map tags kwenda zinazokubalika
     tag_map = {
-        "strong": "b", "em": "i",
-        "h1": "h3", "h2": "h3", "h5": "h4", "h6": "h4",
+        "strong": "b",
+        "em": "i",
+        "h1": "h3",
+        "h2": "h3",
+        "h5": "h4",
+        "h6": "h4",
     }
+
     mapped = tag_map.get(name, name)
 
     if mapped in ALLOWED_TAGS:
         return f"<{mapped}>{inner}</{mapped}>"
 
-    # Tags zisizojulikana — rudisha maandishi tu ndani yake
     return inner
 
 
 def extract_content(soup: BeautifulSoup) -> str:
-    """Toa content yote kutoka ukurasa."""
+    """Toa content kuu kutoka ukurasa bila picha."""
 
-    # Jaribu kupata sehemu kuu ya makala
     main = (
         soup.find("article")
         or soup.find("main")
         or soup.find(class_=lambda c: c and any(
-            x in str(c).lower() for x in ["content", "post-body", "entry", "article-body"]
+            x in str(c).lower()
+            for x in ["content", "post-body", "entry", "article-body"]
         ))
         or soup.find("body")
     )
@@ -94,18 +96,19 @@ def extract_content(soup: BeautifulSoup) -> str:
     parts = []
 
     for tag in main.find_all(
-        ["p", "h2", "h3", "h4", "ul", "ol", "blockquote", "pre", "figure", "img"],
+        ["p", "h2", "h3", "h4", "ul", "ol", "blockquote", "pre"],
         recursive=True
     ):
-        # Epuka kurudia — ruka kama mzazi wake tayari amechakatwa
-        if tag.find_parent(["figure"]) and tag.name == "img":
-            continue
-
         cleaned = clean_node(tag)
+
         if cleaned.strip():
-            # Angalia noise
             plain = BeautifulSoup(cleaned, "html.parser").get_text().strip().lower()
-            if plain and plain not in NOISE_TEXTS and len(plain) > 10:
+
+            if (
+                plain
+                and plain not in NOISE_TEXTS
+                and len(plain) > 10
+            ):
                 parts.append(cleaned)
 
     return "".join(parts)
@@ -115,18 +118,28 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     original_message = update.message
 
     if not context.args:
-        await original_message.reply_text("⚠️ Toa URL. Mfano: /get https://example.com")
+        await original_message.reply_text(
+            "⚠️ Toa URL. Mfano: /get https://example.com"
+        )
         return
 
     url = context.args[0]
 
     if not is_url(url):
-        await original_message.reply_text("⚠️ URL si sahihi. Lazima ianze na http:// au https://")
+        await original_message.reply_text(
+            "⚠️ URL si sahihi. Lazima ianze na http:// au https://"
+        )
         return
 
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=15)
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=15
+        )
+
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -135,18 +148,20 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         h1 = soup.find("h1")
         title = h1.get_text(strip=True) if h1 else "Habari"
 
-        # Content kamili na formatting
+        # Content
         html_content = extract_content(soup)
 
         if not html_content.strip():
-            await original_message.reply_text("⚠️ Imeshindwa kupata content.")
+            await original_message.reply_text(
+                "⚠️ Imeshindwa kupata content."
+            )
             return
 
-        # Telegraph limit ya 64KB
+        # Telegraph limit
         if len(html_content.encode("utf-8")) > 64000:
             html_content = html_content[:60000] + "<p>... (imekatwa)</p>"
 
-        # Chapisha ukurasa wa Telegraph
+        # Create Telegraph page
         page = await telegraph.create_page(
             title=title,
             html_content=html_content,
@@ -162,4 +177,6 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     except Exception as e:
-        await original_message.reply_text(f"❌ Hitilafu: {e}")
+        await original_message.reply_text(
+            f"❌ Hitilafu: {e}"
+        )
