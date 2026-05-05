@@ -12,7 +12,7 @@ NOISE_TEXTS = {
     "post comment",
 }
 
-telegraph = Telegraph(access_token=522e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc)
+telegraph = Telegraph(access_token="622e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc")
 
 
 def is_url(text: str) -> bool:
@@ -43,12 +43,12 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         h1 = soup.find("h1")
         title = h1.text.strip() if h1 else "Habari"
 
-        # Paragraphs
+        # Paragraphs — plain text tu ndani ya <p> tags
         paragraphs = soup.find_all("p")
         lines = []
         for p in paragraphs:
-            text = p.text.strip()
-            if text and text.lower() not in NOISE_TEXTS:
+            text = p.get_text(separator=" ", strip=True)  # text tu, bila tags ndani
+            if text and text.lower() not in NOISE_TEXTS and len(text) > 30:
                 lines.append(f"<p>{text}</p>")
 
         if not lines:
@@ -57,6 +57,9 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         html_content = "".join(lines)
 
+        # Telegraph ina limit ya 64KB
+        if len(html_content.encode("utf-8")) > 64000:
+            html_content = html_content[:60000] + "<p>... (imekatwa)</p>"
 
         # Chapisha ukurasa wa Telegraph
         page = await telegraph.create_page(
