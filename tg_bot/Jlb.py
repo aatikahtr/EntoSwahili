@@ -12,11 +12,17 @@ NOISE_TEXTS = {
     "post comment",
 }
 
-telegraph = Telegraph(access_token="522e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc")
+telegraph = Telegraph()
 
 
 def is_url(text: str) -> bool:
     return text.startswith("http://") or text.startswith("https://")
+
+
+async def setup_telegraph():
+    """Iitwe mara moja tu wakati bot inaanza."""
+    await telegraph.create_account(short_name="MyBot", author_name="My Bot")
+    print("✅ Telegraph iko tayari.")
 
 
 async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -43,11 +49,11 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         h1 = soup.find("h1")
         title = h1.text.strip() if h1 else "Habari"
 
-        # Paragraphs — plain text tu ndani ya <p> tags
+        # Paragraphs
         paragraphs = soup.find_all("p")
         lines = []
         for p in paragraphs:
-            text = p.get_text(separator=" ", strip=True)  # text tu, bila tags ndani
+            text = p.get_text(separator=" ", strip=True)
             if text and text.lower() not in NOISE_TEXTS and len(text) > 30:
                 lines.append(f"<p>{text}</p>")
 
@@ -57,7 +63,7 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         html_content = "".join(lines)
 
-        # Telegraph ina limit ya 64KB
+        # Telegraph limit ya 64KB
         if len(html_content.encode("utf-8")) > 64000:
             html_content = html_content[:60000] + "<p>... (imekatwa)</p>"
 
