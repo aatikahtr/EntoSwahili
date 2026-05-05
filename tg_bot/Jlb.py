@@ -12,7 +12,7 @@ NOISE_TEXTS = {
     "post comment",
 }
 
-telegraph = Telegraph(access_token="622e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc")
+telegraph = Telegraph(access_token="522e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc")
 
 
 def is_url(text: str) -> bool:
