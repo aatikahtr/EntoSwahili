@@ -12,7 +12,7 @@ NOISE_TEXTS = {
     "post comment",
 }
 
-telegraph = Telegraph()
+telegraph = Telegraph(access_token=522e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc)
 
 
 def is_url(text: str) -> bool:
@@ -57,8 +57,6 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         html_content = "".join(lines)
 
-        # Tengeneza account mara moja tu
-        await telegraph.create_account(short_name="MyBot")
 
         # Chapisha ukurasa wa Telegraph
         page = await telegraph.create_page(
