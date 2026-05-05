@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 from telegram import Update
 from telegram.ext import ContextTypes
+from telegraph.aio import Telegraph
 
 NOISE_TEXTS = {
     "table of contents",
@@ -10,6 +11,8 @@ NOISE_TEXTS = {
     "write a comment",
     "post comment",
 }
+
+telegraph = Telegraph()
 
 
 def is_url(text: str) -> bool:
@@ -38,7 +41,7 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Title
         h1 = soup.find("h1")
-        title = h1.text.strip() if h1 else "Hakuna title"
+        title = h1.text.strip() if h1 else "Habari"
 
         # Paragraphs
         paragraphs = soup.find_all("p")
@@ -46,20 +49,31 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for p in paragraphs:
             text = p.text.strip()
             if text and text.lower() not in NOISE_TEXTS:
-                lines.append(text)
+                lines.append(f"<p>{text}</p>")
 
-        content = "\n\n".join(lines)
-
-        if not content:
+        if not lines:
             await original_message.reply_text("⚠️ Imeshindwa kupata content.")
             return
 
-        full_text = f"<b>{title}</b>\n\n{content}"
+        html_content = "".join(lines)
 
-        if len(full_text) > 4096:
-            full_text = full_text[:4090] + "..."
+        # Tengeneza account mara moja tu
+        await telegraph.create_account(short_name="MyBot")
 
-        await original_message.reply_text(full_text, parse_mode="HTML")
+        # Chapisha ukurasa wa Telegraph
+        page = await telegraph.create_page(
+            title=title,
+            html_content=html_content,
+        )
+
+        telegraph_url = f"https://telegra.ph/{page['path']}"
+
+        await original_message.reply_text(
+            f"📄 <b>{title}</b>\n\n"
+            f"🔗 <a href='{telegraph_url}'>Soma hapa (Instant View)</a>",
+            parse_mode="HTML",
+            disable_web_page_preview=False,
+        )
 
     except Exception as e:
         await original_message.reply_text(f"❌ Hitilafu: {e}")
