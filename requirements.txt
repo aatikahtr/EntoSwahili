@@ -4,6 +4,8 @@ deep_translator
 starlette~=0.20.0
 uvicorn~=0.23.2
 #Instant view
+requests
+beautifulsoup4
 playwright
 bs4
 telegraph
