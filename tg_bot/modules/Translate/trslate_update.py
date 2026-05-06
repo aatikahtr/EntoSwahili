@@ -19,7 +19,7 @@ async def trslate_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # - Kama mtumiaji alireply ujumbe → tafsiri ule ujumbe wa asili
         # - Kama ni ujumbe wa kawaida → tafsiri ujumbe huu huu
         target = message.reply_to_message or message
-
+        print("Sawa sawa")
         # Zuia kujitafsiri (bot haireplyi yenyewe)
         if target.from_user and target.from_user.is_bot:
             return
