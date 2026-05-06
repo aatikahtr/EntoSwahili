@@ -138,7 +138,7 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not context.args:
         await original_message.reply_text(
-            "⚠️ Toa URL. Mfano: /get https://example.com"
+            "⚠️ Toa URL🔗. Mfano: /get https://example.com"
         )
         return
 
