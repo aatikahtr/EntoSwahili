@@ -1,3 +1,111 @@
+from playwright.async_api import async_playwright
+from telegram import Update
+from telegram.ext import ContextTypes
+from telegraph.aio import Telegraph
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+
+NOISE_TEXTS = {
+    "table of contents",
+    "sign in with google to post a comment",
+    "no comments yet. be the first!",
+    "write a comment",
+    "post comment",
+}
+
+telegraph = Telegraph(access_token="522e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc")
+
+ALLOWED_TAGS = {
+    "b", "strong", "i", "em", "u", "s", "a",
+    "p", "br", "h3", "h4", "ul", "ol", "li",
+    "blockquote", "pre", "code", "img"
+}
+
+
+def is_url(text: str) -> bool:
+    return text.startswith("http://") or text.startswith("https://")
+
+
+def clean_html(html: str, base_url: str) -> str:
+    soup = BeautifulSoup(html, "html.parser")
+
+    def process_node(tag):
+        from bs4 import NavigableString, Tag
+
+        if isinstance(tag, NavigableString):
+            return str(tag)
+
+        if not isinstance(tag, Tag):
+            return ""
+
+        name = tag.name.lower() if tag.name else ""
+
+        if name in {
+            "script", "style", "nav", "footer",
+            "aside", "form", "button", "input"
+        }:
+            return ""
+
+        if name == "img":
+            src = tag.get("src", "").strip()
+            if not src:
+                return ""
+            src = urljoin(base_url, src)
+            if src.startswith("http"):
+                return f'<img src="{src}"/>'
+            return ""
+
+        if name == "a":
+            href = tag.get("href", "").strip()
+            inner = "".join(process_node(child) for child in tag.children)
+            if href:
+                href = urljoin(base_url, href)
+            if href.startswith("http") and inner.strip():
+                return f'<a href="{href}">{inner}</a>'
+            return inner
+
+        inner = "".join(process_node(child) for child in tag.children)
+
+        if not inner.strip():
+            return ""
+
+        tag_map = {
+            "strong": "b",
+            "em": "i",
+            "h1": "h3",
+            "h2": "h3",
+            "h5": "h4",
+            "h6": "h4",
+        }
+
+        mapped = tag_map.get(name, name)
+
+        if mapped in ALLOWED_TAGS:
+            return f"<{mapped}>{inner}</{mapped}>"
+
+        return inner
+
+    parts = []
+
+    for tag in soup.find_all(
+        ["p", "h2", "h3", "h4", "ul", "ol", "blockquote", "pre", "img"],
+        recursive=True
+    ):
+        cleaned = process_node(tag)
+
+        if cleaned.strip():
+            if cleaned.startswith("<img"):
+                parts.append(cleaned)
+                continue
+
+            plain = BeautifulSoup(cleaned, "html.parser").get_text().strip().lower()
+
+            if plain and plain not in NOISE_TEXTS and len(plain) > 10:
+                parts.append(cleaned)
+
+    return "".join(parts)
+
+
 async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     original_message = update.message
 
@@ -56,7 +164,6 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     content_el = el
                     break
 
-            # Fallback kwa body kama hakuna selector inayofanya kazi
             if not content_el:
                 content_el = await page.query_selector("body")
 
@@ -72,10 +179,7 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await browser.close()
 
         # Safisha content
-        html_content = clean_html(
-            body_html,
-            base_url=url
-        )
+        html_content = clean_html(body_html, base_url=url)
 
         if not html_content.strip():
             await original_message.reply_text(
@@ -83,11 +187,9 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        # Telegraph size limit
         if len(html_content.encode("utf-8")) > 64000:
             html_content = html_content[:60000] + "<p>... (imekatwa)</p>"
 
-        # Create Telegraph page
         page_data = await telegraph.create_page(
             title=title,
             html_content=html_content,
