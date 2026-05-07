@@ -134,7 +134,7 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             browser = await p.chromium.launch(headless=True)
 
             page = await browser.new_page(
-                user_agent="Mozilla/5.0"
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             )
 
             await page.goto(
@@ -151,8 +151,17 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
             # Gundua aina ya website
-            is_wordpress = await page.query_selector("meta[name='generator'][content*='WordPress']")
-            is_blogger = await page.query_selector("meta[name='generator'][content*='Blogger']")
+            is_wordpress = await page.query_selector(
+                "meta[name='generator'][content*='WordPress'], "
+                "meta[name='generator'][content*='Elementor'], "
+                "link[rel='https://api.w.org/']"
+            )
+            is_blogger = await page.query_selector(
+                "meta[name='generator'][content*='Blogger']"
+            )
+            is_drupal = await page.query_selector(
+                "meta[name='Generator'][content*='Drupal']"
+            )
             is_medium = "medium.com" in url
             is_substack = "substack.com" in url
 
@@ -170,6 +179,14 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     ".entry-content",
                     "#post-body",
                     "article",
+                ]
+            elif is_drupal:
+                content_selectors = [
+                    ".field-items",
+                    ".field-item",
+                    ".node__content",
+                    "#main-content",
+                    ".region-content",
                 ]
             elif is_medium:
                 content_selectors = [
@@ -198,6 +215,7 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "main",
                 ]
 
+            # Tafuta content element
             content_el = None
             for selector in content_selectors:
                 el = await page.query_selector(selector)
@@ -205,7 +223,7 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     content_el = el
                     break
 
-            # Fallback kwa body
+            # Fallback kwa body kama hakuna selector inayofanya kazi
             if not content_el:
                 content_el = await page.query_selector("body")
 
@@ -229,9 +247,11 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
+        # Telegraph size limit
         if len(html_content.encode("utf-8")) > 64000:
             html_content = html_content[:60000] + "<p>... (imekatwa)</p>"
 
+        # Create Telegraph page
         page_data = await telegraph.create_page(
             title=title,
             html_content=html_content,
