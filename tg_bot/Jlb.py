@@ -150,18 +150,53 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if h1 else "Habari"
             )
 
-            # Tafuta main content container
-            content_selectors = [
-                #"article",
-                ".entry-content",
-#                ".post-content",
-#                ".article-content",
-#                "main article",
-#                ".single-content",
-#                "#content article",
-#                ".content-area article",
-#                ".site-content article",
-            ]
+            # Gundua aina ya website
+            is_wordpress = await page.query_selector("meta[name='generator'][content*='WordPress']")
+            is_blogger = await page.query_selector("meta[name='generator'][content*='Blogger']")
+            is_medium = "medium.com" in url
+            is_substack = "substack.com" in url
+
+            # Chagua selectors kulingana na aina ya website
+            if is_wordpress:
+                content_selectors = [
+                    ".entry-content",
+                    ".post-content",
+                    "article .content",
+                    "article",
+                ]
+            elif is_blogger:
+                content_selectors = [
+                    ".post-body",
+                    ".entry-content",
+                    "#post-body",
+                    "article",
+                ]
+            elif is_medium:
+                content_selectors = [
+                    "article",
+                    ".meteredContent",
+                    "section",
+                ]
+            elif is_substack:
+                content_selectors = [
+                    ".body.markup",
+                    ".available-content",
+                    "article",
+                ]
+            else:
+                # Generic fallback kwa websites zingine
+                content_selectors = [
+                    "article",
+                    ".entry-content",
+                    ".post-content",
+                    ".article-content",
+                    "main article",
+                    ".single-content",
+                    "#content article",
+                    ".content-area article",
+                    ".site-content article",
+                    "main",
+                ]
 
             content_el = None
             for selector in content_selectors:
@@ -170,6 +205,7 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     content_el = el
                     break
 
+            # Fallback kwa body
             if not content_el:
                 content_el = await page.query_selector("body")
 
@@ -214,3 +250,7 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await original_message.reply_text(
             f"❌ Hitilafu: {e}"
         )
+ 
+ 
+ 
+ 
