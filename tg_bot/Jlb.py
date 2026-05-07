@@ -29,6 +29,18 @@ def is_url(text: str) -> bool:
 def clean_html(html: str, base_url: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
 
+    # Futa tags zote zisizo salama KABLA ya processing
+    for tag in soup.find_all(True):
+        if tag.name and tag.name.lower() not in ALLOWED_TAGS:
+            if tag.name.lower() in {
+                "script", "style", "nav", "footer", "aside",
+                "form", "button", "input", "xml", "svg", "meta",
+                "link", "head", "noscript", "iframe", "canvas",
+                "select", "textarea", "label", "header", "figure",
+                "picture", "source", "video", "audio", "map", "area",
+            }:
+                tag.decompose()  # Futa tag na watoto wake wote
+
     def process_node(tag):
         from bs4 import NavigableString, Tag
 
@@ -39,15 +51,6 @@ def clean_html(html: str, base_url: str) -> str:
             return ""
 
         name = tag.name.lower() if tag.name else ""
-
-        if name in {
-            "script", "style", "nav", "footer",
-            "aside", "form", "button", "input",
-            "xml", "svg", "meta", "link", "head",
-            "noscript", "iframe", "canvas", "select",
-            "textarea", "label", "header", "figure",
-        }:
-            return ""
 
         if name == "img":
             src = tag.get("src", "").strip()
@@ -79,13 +82,10 @@ def clean_html(html: str, base_url: str) -> str:
             "h2": "h3",
             "h5": "h4",
             "h6": "h4",
-            "div": "p",
-            "span": "",
         }
 
         mapped = tag_map.get(name, name)
 
-        # Kama tag haiko kwenye ALLOWED_TAGS, rudisha text tu
         if not mapped or mapped not in ALLOWED_TAGS:
             return inner
 
