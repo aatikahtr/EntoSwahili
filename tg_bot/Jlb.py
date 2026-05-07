@@ -153,7 +153,7 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 #"main article",
                 #".single-content",
                 #"#content article",
-                ".content-area article",
+                #".content-area article",
                 ".site-content article",
             ]
 
