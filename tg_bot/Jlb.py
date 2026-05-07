@@ -42,7 +42,10 @@ def clean_html(html: str, base_url: str) -> str:
 
         if name in {
             "script", "style", "nav", "footer",
-            "aside", "form", "button", "input"
+            "aside", "form", "button", "input",
+            "xml", "svg", "meta", "link", "head",
+            "noscript", "iframe", "canvas", "select",
+            "textarea", "label", "header", "figure",
         }:
             return ""
 
@@ -76,14 +79,17 @@ def clean_html(html: str, base_url: str) -> str:
             "h2": "h3",
             "h5": "h4",
             "h6": "h4",
+            "div": "p",
+            "span": "",
         }
 
         mapped = tag_map.get(name, name)
 
-        if mapped in ALLOWED_TAGS:
-            return f"<{mapped}>{inner}</{mapped}>"
+        # Kama tag haiko kwenye ALLOWED_TAGS, rudisha text tu
+        if not mapped or mapped not in ALLOWED_TAGS:
+            return inner
 
-        return inner
+        return f"<{mapped}>{inner}</{mapped}>"
 
     parts = []
 
