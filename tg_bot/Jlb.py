@@ -146,8 +146,8 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # Tafuta main content container
             content_selectors = [
-                "article",
-#                ".entry-content",
+#                "article",
+                ".entry-content",
 #                ".post-content",
 #                ".article-content",
 #                "main article",
