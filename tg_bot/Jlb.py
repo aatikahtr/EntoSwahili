@@ -29,7 +29,6 @@ def is_url(text: str) -> bool:
 def clean_html(html: str, base_url: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
 
-    # Futa tags zote zisizo salama KABLA ya processing
     for tag in soup.find_all(True):
         if tag.name and tag.name.lower() not in ALLOWED_TAGS:
             if tag.name.lower() in {
@@ -39,7 +38,7 @@ def clean_html(html: str, base_url: str) -> str:
                 "select", "textarea", "label", "header", "figure",
                 "picture", "source", "video", "audio", "map", "area",
             }:
-                tag.decompose()  # Futa tag na watoto wake wote
+                tag.decompose()
 
     def process_node(tag):
         from bs4 import NavigableString, Tag
@@ -150,16 +149,25 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if h1 else "Habari"
             )
 
-            # Tafuta main content container
+            # Selectors - Elementor kwanza, kisha generic
             content_selectors = [
-#                "article",
-#                ".entry-content",
-#                ".post-content",
-#                ".article-content",
-#                "main article",
-#                ".single-content",
-#                "#content article",
-#                ".content-area article",
+                # Elementor (firqatunnajia.com na sites nyingine za Elementor)
+                ".elementor-widget-theme-post-content .elementor-widget-container",
+                ".elementor-widget-theme-post-content",
+                ".elementor-post__content",
+                ".elementor-section .elementor-widget-text-editor",
+
+                # WordPress standard
+                ".entry-content",
+                ".post-content",
+                ".article-content",
+
+                # Generic
+                "article",
+                "main article",
+                ".single-content",
+                "#content article",
+                ".content-area article",
                 ".site-content article",
             ]
 
@@ -167,9 +175,13 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for selector in content_selectors:
                 el = await page.query_selector(selector)
                 if el:
-                    content_el = el
-                    break
+                    # Hakikisha element ina text ya kutosha (si empty wrapper)
+                    text = await el.inner_text()
+                    if len(text.strip()) > 50:
+                        content_el = el
+                        break
 
+            # Fallback - body nzima
             if not content_el:
                 content_el = await page.query_selector("body")
 
@@ -213,4 +225,4 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await original_message.reply_text(
             f"❌ Hitilafu: {e}"
-    )
+        )
