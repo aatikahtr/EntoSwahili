@@ -153,22 +153,22 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             content_selectors = [
                 # Elementor (firqatunnajia.com na sites nyingine za Elementor)
                 ".elementor-widget-theme-post-content .elementor-widget-container",
-                ".elementor-widget-theme-post-content",
-                ".elementor-post__content",
-                ".elementor-section .elementor-widget-text-editor",
+                #".elementor-widget-theme-post-content",
+#                ".elementor-post__content",
+#                ".elementor-section .elementor-widget-text-editor",
 
-                # WordPress standard
-                ".entry-content",
-                ".post-content",
-                ".article-content",
+#                # WordPress standard
+#                ".entry-content",
+#                ".post-content",
+#                ".article-content",
 
-                # Generic
-                "article",
-                "main article",
-                ".single-content",
-                "#content article",
-                ".content-area article",
-                ".site-content article",
+#                # Generic
+#                "article",
+#                "main article",
+#                ".single-content",
+#                "#content article",
+#                ".content-area article",
+#                ".site-content article",
             ]
 
             content_el = None
