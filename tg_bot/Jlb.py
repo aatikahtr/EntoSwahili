@@ -5,31 +5,15 @@ from telegraph.aio import Telegraph
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
-telegraph = Telegraph(access_token="522e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc")
-
-
 NOISE_TEXTS = {
     "table of contents",
     "sign in with google to post a comment",
     "no comments yet. be the first!",
     "write a comment",
     "post comment",
-    "turn on/off menu",
-    "mshirikishe mwenzako",
-    "copy",
-    "related",
-    "radio muhimu",
-    "previous",
-    "next",
-    "share on telegram",
-    "share on whatsapp",
-    "share on facebook",
-    "share on x",
-    "print",
-    "email a link to a friend",
 }
 
-
+telegraph = Telegraph(access_token="522e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc")
 
 # Moja tu - iliyosahihishwa na img
 ALLOWED_TAGS = {
@@ -39,47 +23,12 @@ ALLOWED_TAGS = {
 }
 
 
-# CSS selectors za sections zisizohitajika - zitafutwa kabisa
-UNWANTED_SELECTORS = [
-    # Share buttons
-    ".sharedaddy",
-    ".jp-relatedposts",
-    ".sd-sharing",
-    "[class*='share']",
-    # Related posts
-    "[class*='related']",
-    ".related-posts",
-    # Navigation prev/next
-    ".post-navigation",
-    ".nav-links",
-    ".navigation",
-    "[class*='navigation']",
-    # Sidebar / widgets
-    ".widget",
-    ".sidebar",
-    # Elementor extras
-    ".elementor-share-btn",
-    "[class*='social']",
-    # Copy button area (firqatunnajia specific)
-    ".wp-block-buttons",
-    ".wp-block-button",
-    # Comments
-    "#comments",
-    ".comments-area",
-]
-
-
 def is_url(text: str) -> bool:
     return text.startswith("http://") or text.startswith("https://")
 
 
 def clean_html(html: str, base_url: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
-    
-    # 1. Futa sections zote zisizohitajika kwanza (share, related, nav, n.k.)
-    for selector in UNWANTED_SELECTORS:
-        for tag in soup.select(selector):
-            tag.decompose()
 
     for tag in soup.find_all(True):
         if tag.name and tag.name.lower() not in ALLOWED_TAGS:
@@ -220,14 +169,8 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             is_medium = "medium.com" in url
             is_substack = "substack.com" in url
-            is_firqatunnajia = "firqatunnajia.com" in url
 
-            if is_firqatunnajia:
-                content_selectors = [
-                    ".elementor-widget-theme-post-content .elementor-widget-container",
-                    ]
-            
-            elif is_wordpress:
+            if is_wordpress:
                 content_selectors = [
                     ".entry-content",
                     ".post-content",
@@ -261,8 +204,6 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     ".available-content",
                     "article",
                 ]
-            
-            
             else:
                 content_selectors = [
                     "article",
