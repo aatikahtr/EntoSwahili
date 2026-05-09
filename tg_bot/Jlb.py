@@ -11,7 +11,19 @@ NOISE_TEXTS = {
     "no comments yet. be the first!",
     "write a comment",
     "post comment",
-    "Share on",
+    "turn on/off menu",
+    "mshirikishe mwenzako",
+    "copy",
+    "related",
+    "radio muhimu",
+    "previous",
+    "next",
+    "share on telegram",
+    "share on whatsapp",
+    "share on facebook",
+    "share on x",
+    "print",
+    "email a link to a friend",
 }
 
 telegraph = Telegraph(access_token="522e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc")
@@ -22,6 +34,35 @@ ALLOWED_TAGS = {
     "blockquote", "pre", "code", "img"
 }
 
+# CSS selectors za sections zisizohitajika - zitafutwa kabisa
+UNWANTED_SELECTORS = [
+    # Share buttons
+    ".sharedaddy",
+    ".jp-relatedposts",
+    ".sd-sharing",
+    "[class*='share']",
+    # Related posts
+    "[class*='related']",
+    ".related-posts",
+    # Navigation prev/next
+    ".post-navigation",
+    ".nav-links",
+    ".navigation",
+    "[class*='navigation']",
+    # Sidebar / widgets
+    ".widget",
+    ".sidebar",
+    # Elementor extras
+    ".elementor-share-btn",
+    "[class*='social']",
+    # Copy button area (firqatunnajia specific)
+    ".wp-block-buttons",
+    ".wp-block-button",
+    # Comments
+    "#comments",
+    ".comments-area",
+]
+
 
 def is_url(text: str) -> bool:
     return text.startswith("http://") or text.startswith("https://")
@@ -30,6 +71,12 @@ def is_url(text: str) -> bool:
 def clean_html(html: str, base_url: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
 
+    # 1. Futa sections zote zisizohitajika kwanza (share, related, nav, n.k.)
+    for selector in UNWANTED_SELECTORS:
+        for tag in soup.select(selector):
+            tag.decompose()
+
+    # 2. Futa tags zisizo salama
     for tag in soup.find_all(True):
         if tag.name and tag.name.lower() not in ALLOWED_TAGS:
             if tag.name.lower() in {
@@ -154,29 +201,28 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             content_selectors = [
                 # Elementor (firqatunnajia.com na sites nyingine za Elementor)
                 ".elementor-widget-theme-post-content .elementor-widget-container",
-                #".elementor-widget-theme-post-content",
-#                ".elementor-post__content",
-#                ".elementor-section .elementor-widget-text-editor",
+                ".elementor-widget-theme-post-content",
+                ".elementor-post__content",
+                ".elementor-section .elementor-widget-text-editor",
 
-#                # WordPress standard
-#                ".entry-content",
-#                ".post-content",
-#                ".article-content",
+                # WordPress standard
+                ".entry-content",
+                ".post-content",
+                ".article-content",
 
-#                # Generic
-#                "article",
-#                "main article",
-#                ".single-content",
-#                "#content article",
-#                ".content-area article",
-#                ".site-content article",
+                # Generic
+                "article",
+                "main article",
+                ".single-content",
+                "#content article",
+                ".content-area article",
+                ".site-content article",
             ]
 
             content_el = None
             for selector in content_selectors:
                 el = await page.query_selector(selector)
                 if el:
-                    # Hakikisha element ina text ya kutosha (si empty wrapper)
                     text = await el.inner_text()
                     if len(text.strip()) > 50:
                         content_el = el
