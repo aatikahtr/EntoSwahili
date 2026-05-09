@@ -11,6 +11,7 @@ NOISE_TEXTS = {
     "no comments yet. be the first!",
     "write a comment",
     "post comment",
+    "Share on",
 }
 
 telegraph = Telegraph(access_token="522e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc")
