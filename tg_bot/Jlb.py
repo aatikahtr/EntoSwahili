@@ -38,31 +38,31 @@ UNWANTED_SELECTORS = [
     ".sd-sharing",
     "[class*='share']",
     
-#    # Related posts
-#    "[class*='related']",
-#    ".related-posts",
-#    
-#    # Navigation prev/next
-#    ".post-navigation",
-#    ".nav-links",
-#    ".navigation",
-#    "[class*='navigation']",
-#    
-#    # Sidebar / widgets
-#    ".widget",
-#    ".sidebar",
-#    
-#    # Elementor extras
-#    ".elementor-share-btn",
-#    "[class*='social']",
-#    
-#    # Copy button area (firqatunnajia specific)
-#    ".wp-block-buttons",
-#    ".wp-block-button",
-#    
-#    # Comments
-#    "#comments",
-#    ".comments-area",
+    # Related posts
+    "[class*='related']",
+    ".related-posts",
+    
+    # Navigation prev/next
+    ".post-navigation",
+    ".nav-links",
+    ".navigation",
+    "[class*='navigation']",
+    
+    # Sidebar / widgets
+    ".widget",
+    ".sidebar",
+    
+    # Elementor extras
+    ".elementor-share-btn",
+    "[class*='social']",
+    
+    # Copy button area (firqatunnajia specific)
+    ".wp-block-buttons",
+    ".wp-block-button",
+    
+    # Comments
+    "#comments",
+    ".comments-area",
 ]
 
 
