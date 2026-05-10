@@ -1,4 +1,5 @@
-import requests
+#import requests
+import httpx
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegraph.aio import Telegraph
@@ -211,9 +212,12 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        response = requests.get(url, headers=HEADERS, timeout=30)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, "html.parser")
+        async with httpx.AsyncClient(headers=HEADERS, timeout=30, follow_redirects=True) as client:
+            #response = requests.get(url, headers=HEADERS, timeout=30)
+            response = await client.get(url)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            
 
         # Pata title
         h1 = soup.find("h1")
