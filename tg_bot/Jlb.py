@@ -1,3 +1,4 @@
+#import requests
 import httpx
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -200,7 +201,10 @@ def clean_html(html: str, base_url: str) -> str:
             if plain and plain not in NOISE_TEXTS and len(plain) > 10:
                 parts.append(cleaned)
 
-    return "".join(parts)
+    
+    final = "".join(parts)
+    soup_fix = BeautifulSoup(final, "html.parser")
+    return soup_fix.decode_contents()
 
 
 #=======
