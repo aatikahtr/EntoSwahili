@@ -1,4 +1,3 @@
-#import requests
 import httpx
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -116,16 +115,21 @@ def find_content_element(soup: BeautifulSoup, selectors: list):
     return soup.find("body")
 
 
+import re
+
 def clean_html(html: str, base_url: str) -> str:
+    # Futa XML kwanza kabla BeautifulSoup haijasoma
+    html = re.sub(r'<\?xml[^>]*\?>', '', html)
+    html = re.sub(r'<xml[^>]*>.*?</xml>', '', html, flags=re.DOTALL)
+    
     soup = BeautifulSoup(html, "html.parser")
     
-    # 1. Futa sections zote zisizohitajika kwanza (share, related, nav, n.k.)
-    
+    # 1. Futa sections zote zisizohitajika kwanza
     for selector in UNWANTED_SELECTORS:
         for tag in soup.select(selector):
             tag.decompose()
 
-    # Ondoa tags zisizohitajika
+    # 2. Ondoa tags zisizohitajika
     for tag in soup.find_all(True):
         if tag.name and tag.name.lower() in {
             "script", "style", "nav", "footer", "aside",
