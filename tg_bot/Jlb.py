@@ -1,8 +1,10 @@
+#import requests
 import httpx
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegraph.aio import Telegraph
 from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup as BS
 from urllib.parse import urljoin
 
 telegraph = Telegraph(access_token="522e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc")
@@ -240,12 +242,15 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await original_message.reply_text("⚠️ Imeshindwa kupata content.")
             return
 
+
         html_content = clean_html(str(content_el), base_url=url)
 
         if not html_content.strip():
             await original_message.reply_text("⚠️ Imeshindwa kupata content.")
             return
 
+        html_content = str(BS(html_content, "html.parser"))
+        
         if len(html_content.encode("utf-8")) > 64000:
             html_content = html_content[:60000] + "<p>... (imekatwa)</p>"
 
