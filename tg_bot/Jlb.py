@@ -1,4 +1,3 @@
-#import requests
 import httpx
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -223,11 +222,9 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         async with httpx.AsyncClient(headers=HEADERS, timeout=30, follow_redirects=True) as client:
-            #response = requests.get(url, headers=HEADERS, timeout=30)
             response = await client.get(url)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")
-            
 
         # Pata title
         h1 = soup.find("h1")
@@ -242,15 +239,16 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await original_message.reply_text("⚠️ Imeshindwa kupata content.")
             return
 
-
         html_content = clean_html(str(content_el), base_url=url)
 
         if not html_content.strip():
             await original_message.reply_text("⚠️ Imeshindwa kupata content.")
             return
 
-        html_content = str(BS(html_content, "html.parser"))
-        
+        # Funga tags zilizo wazi
+        soup_fix = BS(html_content, "html.parser")
+        html_content = soup_fix.decode_contents()
+
         if len(html_content.encode("utf-8")) > 64000:
             html_content = html_content[:60000] + "<p>... (imekatwa)</p>"
 
@@ -263,10 +261,15 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML",
             disable_web_page_preview=False,
         )
-    
-    
+
     except httpx.HTTPError as e:
         await original_message.reply_text(f"❌ Hitilafu ya mtandao: {e}")
     except Exception as e:
         await original_message.reply_text(f"❌ Hitilafu: {e}")
+
+
+
+
+
+
         
