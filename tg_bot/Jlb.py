@@ -5,6 +5,9 @@ from telegraph.aio import Telegraph
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
+telegraph = Telegraph(access_token="522e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc")
+
+
 NOISE_TEXTS = {
     "table of contents",
     "sign in with google to post a comment",
@@ -13,7 +16,7 @@ NOISE_TEXTS = {
     "post comment",
 }
 
-telegraph = Telegraph(access_token="522e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc")
+
 
 ALLOWED_TAGS = {
     "p", "a", "b", "strong", "i", "em", "u",
@@ -21,9 +24,42 @@ ALLOWED_TAGS = {
     "ul", "ol", "li", "br", "img"
 }
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-}
+
+# CSS selectors za sections zisizohitajika - zitafutwa kabisa
+UNWANTED_SELECTORS = [
+    # Share buttons
+    ".sharedaddy",
+    ".jp-relatedposts",
+    ".sd-sharing",
+    "[class*='share']",
+    
+#    # Related posts
+#    "[class*='related']",
+#    ".related-posts",
+#    
+#    # Navigation prev/next
+#    ".post-navigation",
+#    ".nav-links",
+#    ".navigation",
+#    "[class*='navigation']",
+#    
+#    # Sidebar / widgets
+#    ".widget",
+#    ".sidebar",
+#    
+#    # Elementor extras
+#    ".elementor-share-btn",
+#    "[class*='social']",
+#    
+#    # Copy button area (firqatunnajia specific)
+#    ".wp-block-buttons",
+#    ".wp-block-button",
+#    
+#    # Comments
+#    "#comments",
+#    ".comments-area",
+]
+
 
 
 def is_url(text: str) -> bool:
@@ -76,6 +112,12 @@ def find_content_element(soup: BeautifulSoup, selectors: list):
 
 def clean_html(html: str, base_url: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
+    
+    # 1. Futa sections zote zisizohitajika kwanza (share, related, nav, n.k.)
+    
+    for selector in UNWANTED_SELECTORS:
+        for tag in soup.select(selector):
+            tag.decompose()
 
     # Ondoa tags zisizohitajika
     for tag in soup.find_all(True):
