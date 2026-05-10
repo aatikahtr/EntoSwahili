@@ -198,6 +198,10 @@ def clean_html(html: str, base_url: str) -> str:
     return "".join(parts)
 
 
+#=======
+# Commmand
+#=======
+
 async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     original_message = update.message
 
@@ -250,8 +254,10 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML",
             disable_web_page_preview=False,
         )
-
-    except requests.RequestException as e:
+    
+    
+    except httpx.HTTPError as e:
         await original_message.reply_text(f"❌ Hitilafu ya mtandao: {e}")
     except Exception as e:
         await original_message.reply_text(f"❌ Hitilafu: {e}")
+        
