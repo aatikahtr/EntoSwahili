@@ -1,5 +1,6 @@
 async def check_selectors(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = context.args[0] if context.args else "https://www.alhidaaya.com/sw/node/4492"
+    url = update.message.reply_to_message
     
     async with httpx.AsyncClient(headers=HEADERS, timeout=30, follow_redirects=True) as client:
         response = await client.get(url)
