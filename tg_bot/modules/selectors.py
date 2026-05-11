@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 
 
 async def check_selectors(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("sawa")
     
     # Njia 1 - URL kwenye command: /check https://example.com
     if context.args:
