@@ -1,7 +1,16 @@
 import httpx                          
 from telegram import Update           
 from telegram.ext import ContextTypes 
-from bs4 import BeautifulSoup         
+from bs4 import BeautifulSoup
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+def is_url(text: str) -> bool:
+    return text.startswith("http://") or text.startswith("https://")
+    
 
 
 async def check_selectors(update: Update, context: ContextTypes.DEFAULT_TYPE):
