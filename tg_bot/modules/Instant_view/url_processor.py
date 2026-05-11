@@ -165,7 +165,7 @@ async def extract_content(
 
     # ===== ARTICLE ROOT =====
     article = (
-        soup.find("article")
+        soup.find(".elementor-widget-theme-post-content .elementor-widget-container")
         or soup.find("main")
         or soup.find("div", class_=lambda c: c and any(
             x in c for x in [
