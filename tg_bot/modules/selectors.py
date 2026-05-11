@@ -1,3 +1,9 @@
+import httpx                          
+from telegram import Update           
+from telegram.ext import ContextTypes 
+from bs4 import BeautifulSoup         
+
+
 async def check_selectors(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Njia 1 - URL kwenye command: /check https://example.com
