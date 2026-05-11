@@ -33,7 +33,16 @@ ALLOWED_TAGS = {
 
 # CSS selectors za sections zisizohitajika - zitafutwa kabisa
 UNWANTED_SELECTORS = [
-   # ".grid_4", 
+    # Drupal sidebar na chini
+    ".grid_4",                   # ✅ Sidebar ya kulia - Bonyeza/links
+    ".region-sidebar-second",    # ✅ Sidebar ya pili
+    ".block-views",              # ✅ Related posts/Yanayohusiana
+    ".view-similarterms",        # ✅ Yanayohusiana
+    ".region-footer",            # ✅ Footer
+    ".breadcrumb",               # ✅ Navigation ya juu
+    ".block-menu",               # ✅ Menu blocks
+    ".block-block",              # ✅ Visitors counter
+    ".block-superfish",          # ✅ Menu ya ziada
     # Share buttons
     ".sharedaddy",
     ".jp-relatedposts",
