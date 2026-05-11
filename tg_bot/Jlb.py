@@ -4,7 +4,6 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegraph.aio import Telegraph
 from bs4 import BeautifulSoup
-from bs4 import BeautifulSoup as BS
 from urllib.parse import urljoin
 
 telegraph = Telegraph(access_token="522e083178bb4d7511cc1784c3f849b9e71164cdac06d08812181c1945dc")
@@ -207,6 +206,7 @@ def clean_html(html: str, base_url: str) -> str:
     return soup_fix.decode_contents()
 
 
+
 #=======
 # Commmand
 #=======
@@ -226,9 +226,11 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         async with httpx.AsyncClient(headers=HEADERS, timeout=30, follow_redirects=True) as client:
+            #response = requests.get(url, headers=HEADERS, timeout=30)
             response = await client.get(url)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")
+            
 
         # Pata title
         h1 = soup.find("h1")
@@ -249,10 +251,6 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await original_message.reply_text("⚠️ Imeshindwa kupata content.")
             return
 
-        # Funga tags zilizo wazi
-        soup_fix = BS(html_content, "html.parser")
-        html_content = soup_fix.decode_contents()
-
         if len(html_content.encode("utf-8")) > 64000:
             html_content = html_content[:60000] + "<p>... (imekatwa)</p>"
 
@@ -265,15 +263,10 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML",
             disable_web_page_preview=False,
         )
-
+    
+    
     except httpx.HTTPError as e:
         await original_message.reply_text(f"❌ Hitilafu ya mtandao: {e}")
     except Exception as e:
         await original_message.reply_text(f"❌ Hitilafu: {e}")
-
-
-
-
-
-
         
