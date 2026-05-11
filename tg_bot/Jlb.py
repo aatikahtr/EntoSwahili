@@ -94,7 +94,14 @@ def detect_platform(soup: BeautifulSoup, url: str):
 
 def get_content_selectors(platform: str):
     selectors = {
-        "wordpress": [".elementor-widget-theme-post-content .elementor-widget-container", ".entry-content", ".post-content", "article .content", "article"],
+        "wordpress": [
+    ".elementor-widget-theme-post-content .elementor-widget-container",
+    ".elementor-location-single .elementor-widget-container",  # ✅ Ongeza
+    ".entry-content",
+    ".post-content",
+    "article .content",
+    "article",
+],
         "blogger":   [".post-body", ".entry-content", "#post-body", "article"],
         "drupal":    [".field-items", ".field-item", ".node__content", "#main-content", ".region-content"],
         "medium":    ["article", ".meteredContent", "section"],
