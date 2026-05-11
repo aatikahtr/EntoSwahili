@@ -14,7 +14,11 @@ from telegram.ext import (
     filters,
 )
 
+#=========
+#Jalibio
+#==========
 from Jlb import get_command
+
 #===========
 # Translate
 #===========
@@ -31,6 +35,12 @@ from modules.Instant_view.instant_command import instant_view_command
 # Moja moja
 #==========
 from modules.Mojamoja.moja1 import mojaone
+
+
+#=========
+#Check  Url
+#=========
+from modules.selectors import check_selectors
 
 
 # Bot Configuration
@@ -79,6 +89,10 @@ async def main():
             filters=filters.ChatType.PRIVATE
         )
     )
+    
+    
+    app.add_handler(CommandHandler("check", check_selectors))
+    
     
     # GROUP/SUPERGROUP: MessageHandler + filter ya group IDs zilizoruhusiwa
     allowed_chats = filters.Chat(chat_id=ALLOWED_GROUPS)
