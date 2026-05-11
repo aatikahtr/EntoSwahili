@@ -33,7 +33,7 @@ ALLOWED_TAGS = {
 
 # CSS selectors za sections zisizohitajika - zitafutwa kabisa
 UNWANTED_SELECTORS = [
-    ".grid_4", 
+   # ".grid_4", 
     # Share buttons
     ".sharedaddy",
     ".jp-relatedposts",
