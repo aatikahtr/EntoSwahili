@@ -112,9 +112,8 @@ def get_content_selectors(platform: str):
         "blogger":   [".post-body", ".entry-content", "#post-body", "article"],
         
         "drupal": [
-    ".field-name-body .field-item",   # ✅ Bora kabisa
-    ".field-name-body",               # ✅ Backup
-    ".node .content.clearfix",        # ✅ Backup
+    ".field-name-body .field-item",  # ✅ Content tu - bila chochote kingine
+    ".field-name-body",
     ".node__content",
     "#main-content",
     ".region-content",
