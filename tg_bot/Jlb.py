@@ -56,6 +56,9 @@ UNWANTED_SELECTORS = [
     # Elementor extras
     ".elementor-share-btn",
     "[class*='social']",
+    ".elementor-social-icons-wrapper",  # ✅ Ongeza - social icons
+    ".elementor-counter",               # ✅ Ongeza - counter ya makala/mp3
+    ".elementor-search-form__container", # ✅ Ongeza - search form
     
     # Copy button area (firqatunnajia specific)
     ".wp-block-buttons",
@@ -64,6 +67,7 @@ UNWANTED_SELECTORS = [
     # Comments
     "#comments",
     ".comments-area",
+    ".aps-container",                   # ✅ Ongeza - comments section
 ]
 
 
