@@ -33,6 +33,7 @@ ALLOWED_TAGS = {
 
 # CSS selectors za sections zisizohitajika - zitafutwa kabisa
 UNWANTED_SELECTORS = [
+    ".grid_4", 
     # Share buttons
     ".sharedaddy",
     ".jp-relatedposts",
@@ -100,7 +101,16 @@ def get_content_selectors(platform: str):
     selectors = {
         "wordpress": [".elementor-widget-theme-post-content .elementor-widget-container", ".entry-content", ".post-content", "article .content", "article"],
         "blogger":   [".post-body", ".entry-content", "#post-body", "article"],
-        "drupal":    [".field-items", ".field-item", ".node__content", "#main-content", ".region-content"],
+        
+        "drupal": [
+    ".field-name-body .field-item",   # ✅ Bora kabisa
+    ".field-name-body",               # ✅ Backup
+    ".node .content.clearfix",        # ✅ Backup
+    ".node__content",
+    "#main-content",
+    ".region-content",
+],
+        
         "medium":    ["article", ".meteredContent", "section"],
         "substack":  [".body.markup", ".available-content", "article"],
         "generic":   [
