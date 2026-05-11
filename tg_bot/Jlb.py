@@ -33,6 +33,7 @@ ALLOWED_TAGS = {
 
 # CSS selectors za sections zisizohitajika - zitafutwa kabisa
 UNWANTED_SELECTORS = [
+    ".breadcrumb",
     # Drupal sidebar na chini
     ".grid_4",                   # ✅ Sidebar ya kulia - Bonyeza/links
     ".region-sidebar-second",    # ✅ Sidebar ya pili
