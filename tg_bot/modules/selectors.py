@@ -221,18 +221,28 @@ async def check_selectors(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-
-
 async def handle_tweet_check(update: Update, tweet_id: str, original_url: str):
-    """Tumia fxtwitter API badala ya scraping."""
     api_url = f"https://api.fxtwitter.com/status/{tweet_id}"
 
     async with httpx.AsyncClient(headers=HEADERS, timeout=30) as client:
         response = await client.get(api_url)
+
+    # ✅ Rekebisha encoding kabla ya JSON parsing
+    try:
         data = response.json()
+    except Exception:
+        try:
+            data = __import__('json').loads(response.content.decode('utf-8', errors='replace'))
+        except Exception as e:
+            await update.message.reply_text(f"❌ Imeshindwa kusoma majibu ya API: {e}")
+            return
 
     tweet = data.get("tweet", {})
     author = tweet.get("author", {})
+
+    if not tweet:
+        await update.message.reply_text("❌ Tweet haikupatikana.")
+        return
 
     msg = f"🌐 *URL:* {original_url}\n"
     msg += f"📦 *Platform:* `Twitter/X`\n\n"
