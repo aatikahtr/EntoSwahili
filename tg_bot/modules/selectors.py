@@ -1,3 +1,4 @@
+import re
 import httpx
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -141,9 +142,25 @@ def detect_platform(soup: BeautifulSoup, response_headers: dict, html: str) -> d
     return result
 
 
-async def check_selectors(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("sawa")
 
+
+
+
+def detect_twitter_url(url: str) -> str | None:
+    """Pata tweet ID kama ni Twitter/X/fxtwitter URL."""
+    patterns = [
+        r"(?:twitter\.com|x\.com|fxtwitter\.com)/(?:i/status|[^/]+/status)/(\d+)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+
+async def check_selectors(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    # 1. Pata URL kwanza
     if context.args:
         url = context.args[0]
     elif update.message.reply_to_message and update.message.reply_to_message.text:
@@ -155,39 +172,76 @@ async def check_selectors(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ URL si sahihi.")
         return
 
+    # 2. Angalia kama ni tweet
+    tweet_id = detect_twitter_url(url)
+    if tweet_id:
+        await handle_tweet_check(update, tweet_id, url)
+        return
+
+    # 3. Scraping ya kawaida
     async with httpx.AsyncClient(headers=HEADERS, timeout=30, follow_redirects=True) as client:
         response = await client.get(url)
         html = response.text
         soup = BeautifulSoup(html, "html.parser")
 
-        # Tambua platform
-        platform_info = detect_platform(soup, dict(response.headers), html)
+    # 4. Tambua platform
+    platform_info = detect_platform(soup, dict(response.headers), html)
 
-        # Jenga ujumbe
-        msg = f"🌐 *URL:* {url}\n"
-        msg += f"📦 *Platform:* `{platform_info['platform']}`\n"
+    # 5. Jenga ujumbe
+    msg = f"🌐 *URL:* {url}\n"
+    msg += f"📦 *Platform:* `{platform_info['platform']}`\n"
 
-        if platform_info["evidence"]:
-            msg += "\n🔍 *Ushahidi:*\n"
-            for e in platform_info["evidence"]:
-                msg += f"  • {e}\n"
+    if platform_info["evidence"]:
+        msg += "\n🔍 *Ushahidi:*\n"
+        for e in platform_info["evidence"]:
+            msg += f"  • {e}\n"
 
-        await update.message.reply_text(msg, parse_mode="Markdown")
+    await update.message.reply_text(msg, parse_mode="Markdown")
 
-        # Pia tuma div classes kama kawaida (optional - unaweza kuondoa)
-        results = []
-        for div in soup.find_all("div", class_=True):
-            classes = " ".join(div.get("class", []))
-            text = div.get_text().strip()[:50]
-            if text:
-                results.append(f"• {classes[:50]} → {text[:30]}")
+    # 6. Tuma div classes
+    results = []
+    for div in soup.find_all("div", class_=True):
+        classes = " ".join(div.get("class", []))
+        text = div.get_text().strip()[:50]
+        if text:
+            results.append(f"• {classes[:50]} → {text[:30]}")
 
-        chunk = ""
-        for line in results[:50]:
-            chunk += line + "\n"
-            if len(chunk) > 3000:
-                await update.message.reply_text(chunk)
-                chunk = ""
-
-        if chunk:
+    chunk = ""
+    for line in results[:50]:
+        chunk += line + "\n"
+        if len(chunk) > 3000:
             await update.message.reply_text(chunk)
+            chunk = ""
+
+    if chunk:
+        await update.message.reply_text(chunk)
+
+
+            
+
+
+
+
+
+async def handle_tweet_check(update: Update, tweet_id: str, original_url: str):
+    """Tumia fxtwitter API badala ya scraping."""
+    api_url = f"https://api.fxtwitter.com/status/{tweet_id}"
+
+    async with httpx.AsyncClient(headers=HEADERS, timeout=30) as client:
+        response = await client.get(api_url)
+        data = response.json()
+
+    tweet = data.get("tweet", {})
+    author = tweet.get("author", {})
+
+    msg = f"🌐 *URL:* {original_url}\n"
+    msg += f"📦 *Platform:* `Twitter/X`\n\n"
+    msg += f"👤 *Mwandishi:* {author.get('name', '?')} (@{author.get('screen_name', '?')})\n"
+    msg += f"📝 *Tweet:*\n{tweet.get('text', 'Hakuna maandishi')}\n"
+    msg += f"📅 *Tarehe:* {tweet.get('created_at', '?')}\n"
+    msg += f"❤️ {tweet.get('likes', 0)} | 🔁 {tweet.get('retweets', 0)}"
+
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+
+
