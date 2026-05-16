@@ -34,32 +34,17 @@ ALLOWED_TAGS = {
 # CSS selectors za sections zisizohitajika - zitafutwa kabisa
 UNWANTED_SELECTORS = [
     ".breadcrumb",
-    "lg:hidden",
+    "[class*='lg:hidden']",
+    
     # Drupal sidebar na chini
-    ".grid_4",                   # ✅ Sidebar ya kulia - Bonyeza/links
-    ".region-sidebar-second",    # ✅ Sidebar ya pili
-    ".block-views",              # ✅ Related posts/Yanayohusiana
-    ".view-similarterms",        # ✅ Yanayohusiana
-    ".region-footer",            # ✅ Footer
-    ".breadcrumb",               # ✅ Navigation ya juu
-    ".block-menu",               # ✅ Menu blocks
-    ".block-block",              # ✅ Visitors counter
-    ".block-superfish",          # ✅ Menu ya ziada
-    # Share buttons
+    ".grid_4",
     ".sharedaddy",
-    ".jp-relatedposts",
-    ".sd-sharing",
-    "[class*='share']",
     
     # Related posts
     "[class*='related']",
-    ".related-posts",
     
     # Navigation prev/next
     ".post-navigation",
-    ".nav-links",
-    ".navigation",
-    "[class*='navigation']",
     
     # Sidebar / widgets
     ".widget",
@@ -68,18 +53,12 @@ UNWANTED_SELECTORS = [
     # Elementor extras
     ".elementor-share-btn",
     "[class*='social']",
-    ".elementor-social-icons-wrapper",  # ✅ Ongeza - social icons
-    ".elementor-counter",               # ✅ Ongeza - counter ya makala/mp3
-    ".elementor-search-form__container", # ✅ Ongeza - search form
     
     # Copy button area (firqatunnajia specific)
     ".wp-block-buttons",
-    ".wp-block-button",
     
     # Comments
-    "#comments",
-    ".comments-area",
-    ".aps-container",                   # ✅ Ongeza - comments section
+    "#comments",                   # ✅ Ongeza - comments section
 ]
 
 
@@ -154,6 +133,11 @@ def clean_html(html: str, base_url: str) -> str:
         for tag in soup.select(selector):
             tag.decompose()
 
+    for tag in soup.find_all(class_=True):
+        if "lg:hidden" in tag.get("class", []):
+            tag.decompose()
+
+    
     # 2. Ondoa tags zisizohitajika
     for tag in soup.find_all(True):
         if tag.name and tag.name.lower() in {
