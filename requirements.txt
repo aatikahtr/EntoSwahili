@@ -12,3 +12,9 @@ bs4
 telegraph
 aiohttp
 
+#Rss
+
+#rss
+#python-telegram-bot[job-queue]
+motor
+
