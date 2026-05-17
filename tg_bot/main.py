@@ -43,6 +43,15 @@ from modules.Mojamoja.moja1 import mojaone
 from modules.selectors import check_selectors
 
 
+#============
+#Website to rss
+#=============
+
+from modules.Rss.rss_command import rss_command
+from modules.Rss.rss_scheduler import setup_scheduler
+
+
+
 # Bot Configuration
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 URL = os.getenv("URL")
@@ -92,6 +101,12 @@ async def main():
     
     
     app.add_handler(CommandHandler("check", check_selectors))
+    
+        # ── Handlers ───────
+    app.add_handler(CommandHandler("rss", rss_command))
+
+    # ── Washa RSS Scheduler ──
+    setup_scheduler(app, interval_minutes=10)
     
     
     # GROUP/SUPERGROUP: MessageHandler + filter ya group IDs zilizoruhusiwa
