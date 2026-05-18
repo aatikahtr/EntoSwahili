@@ -17,7 +17,7 @@ from telegram.ext import (
 #=========
 #Jalibio
 #==========
-from Jlb import get_command
+from modules.Instant_view.IslamSite import get_command
 
 #===========
 # Translate
