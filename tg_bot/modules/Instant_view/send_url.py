@@ -9,7 +9,8 @@ from modules.Instant_view.IslamSite.constants import telegraph
 from modules.Instant_view.IslamSite.html_cleaner import clean_html
 from modules.Instant_view.IslamSite.constants import HEADERS
 
-
+def is_url(text: str) -> bool:
+    return text.startswith("http://") or text.startswith("https://")
 
 #=======
 # Command
