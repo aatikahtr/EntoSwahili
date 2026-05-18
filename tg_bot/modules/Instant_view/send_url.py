@@ -2,7 +2,7 @@ import httpx
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from IslamSite.constants import telegraph
+from tg_bot.modules.Instant_view.IslamSite.constants import telegraph
 
 # Local module
 #tg_bot/modules/Instant_view/send_url.py
