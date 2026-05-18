@@ -14,6 +14,34 @@ from modules.Instant_view.IslamSite.constants import HEADERS
 def is_url(text: str) -> bool:
     return text.startswith("http://") or text.startswith("https://")
 
+
+def detect_platform(soup: BeautifulSoup, url: str):
+    """Gundua platform kutoka kwa meta tags au URL."""
+    generator = soup.find("meta", attrs={"name": "generator"})
+    gen_content = (generator.get("content", "") if generator else "").lower()
+
+    if "wordpress" in gen_content or "elementor" in gen_content:
+        return "wordpress"
+    if soup.find("link", attrs={"rel": "https://api.w.org/"}):
+        return "wordpress"
+    if "blogger" in gen_content:
+        return "blogger"
+    if "drupal" in gen_content:
+        return "drupal"
+    if "medium.com" in url:
+        return "medium"
+    if "substack.com" in url:
+        return "substack"
+    # TRT Afrika na TRT World
+    if "trtafrika.com" in url or "trtworld.com" in url:
+        return "trtafrika"
+
+    return "generic"
+
+
+
+
+
 #=======
 # Command
 #=======
