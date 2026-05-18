@@ -7,6 +7,11 @@ from bs4 import BeautifulSoup, NavigableString, Tag, Comment
 from urllib.parse import urljoin
 
 
+
+def is_url(text: str) -> bool:
+    return text.startswith("http://") or text.startswith("https://")
+
+
 async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     original_message = update.message
 
