@@ -32,7 +32,7 @@ from bs4 import (
 from urllib.parse import urljoin
 
 from .table_converter import convert_to_telegraph
-from constants import (
+from .constants import (
     NOISE_TEXTS,
     SKIP_TAGS,
     TAG_MAP,
