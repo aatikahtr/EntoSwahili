@@ -34,6 +34,14 @@ def is_noise_text(text: str) -> bool:
 
 
 
+def get_node_text(node) -> str:
+    """Pata text yote kutoka node bila tags."""
+    if isinstance(node, NavigableString):
+        return str(node)
+    return node.get_text(separator=" ", strip=True)
+
+
+
 def process_node(node, base_url: str, soup: BeautifulSoup) -> list:
     """
     Traverse DOM node kwa node, isafishe na irudishe list ya
