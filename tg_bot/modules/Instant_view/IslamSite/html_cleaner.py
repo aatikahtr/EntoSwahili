@@ -8,7 +8,15 @@ formatting chafu
 
 '''
 
+# Standard library
+import re
+
+# Third-party
+from bs4 import BeautifulSoup
+
+# Local modules
 from .clean_node import process_node
+from .constants import UNWANTED_SELECTORS
 
 
 def clean_html(html: str, base_url: str) -> str:
