@@ -1,11 +1,10 @@
-import re
+
 from playwright.async_api import async_playwright
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegraph.aio import Telegraph
-from bs4 import BeautifulSoup, NavigableString, Tag, Comment
-from urllib.parse import urljoin
 
+# Local module
 from .html_cleaner import clean_html
 
 
