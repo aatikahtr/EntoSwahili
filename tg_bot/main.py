@@ -99,7 +99,15 @@ async def main():
             filters=filters.ChatType.PRIVATE
         )
     )
-    app.add_handler(CommandHandler("link", send_command))
+
+
+    app.add_handler(
+        CommandHandler(
+            "link",
+            send_command,
+            filters=filters.ChatType.PRIVATE
+        )
+    )
     
     
     app.add_handler(CommandHandler("check", check_selectors))
