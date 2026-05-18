@@ -20,6 +20,20 @@ empty nodes
 
 '''
 
+def is_noise_text(text: str) -> bool:
+    """Angalia kama text ni noise/boilerplate."""
+    cleaned = text.strip().lower()
+    if not cleaned:
+        return True
+    if cleaned in NOISE_TEXTS:
+        return True
+    # Fupi sana na haina maana
+    if len(cleaned) < 3:
+        return True
+    return False
+
+
+
 def process_node(node, base_url: str, soup: BeautifulSoup) -> list:
     """
     Traverse DOM node kwa node, isafishe na irudishe list ya
