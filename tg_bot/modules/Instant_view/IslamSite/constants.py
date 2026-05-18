@@ -31,12 +31,89 @@ ALLOWED_TAGS = {
 }
 
 UNWANTED_SELECTORS = [
+    # ── WordPress ──────────────────────────────────────────
     ".sharedaddy",
     ".jp-relatedposts",
     ".sd-sharing",
-    "[class*='share']",
     ".wp-block-buttons",
     ".wp-block-button",
+    ".wp-block-separator",
+    ".wp-caption-text",
+
+    # ── Kushiriki / Share buttons ──────────────────────────
+    "[class*='share']",
+    "[class*='sharing']",
+    "[id*='share']",
+    "[class*='social']",
+    "[class*='follow']",
+
+    # ── Matangazo / Ads ────────────────────────────────────
+    "[class*='advert']",
+    "[class*='advertisement']",
+    "[class*='ads-']",
+    "[id*='advert']",
+    "[class*='banner']",
+    "[class*='sponsored']",
+    ".ad",
+    ".ads",
+
+    # ── Related / Recommended articles ────────────────────
+    "[class*='related']",
+    "[class*='recommended']",
+    "[class*='suggestion']",
+    "[class*='more-stories']",
+    "[class*='more-articles']",
+    "[class*='read-more']",
+    "[class*='also-read']",
+    "[id*='related']",
+
+    # ── Comments ───────────────────────────────────────────
+    "[class*='comment']",
+    "[id*='comment']",
+    "#disqus_thread",
+    ".disqus",
+
+    # ── Newsletter / Subscribe ─────────────────────────────
+    "[class*='newsletter']",
+    "[class*='subscribe']",
+    "[class*='signup']",
+    "[class*='sign-up']",
+
+    # ── Navigation / Menu ──────────────────────────────────
+    "[class*='breadcrumb']",
+    "[class*='pagination']",
+    "[class*='sidebar']",
+    "[class*='widget']",
+    "[class*='menu']",
+    "[role='navigation']",
+
+    # ── Author / Tags / Category boxes ────────────────────
+    "[class*='author-box']",
+    "[class*='author-bio']",
+    "[class*='post-tags']",
+    "[class*='article-tags']",
+    "[class*='tag-list']",
+    "[class*='category-label']",
+
+    # ── Footer ya makala ───────────────────────────────────
+    "[class*='article-footer']",
+    "[class*='post-footer']",
+    "[class*='entry-footer']",
+    "[class*='story-footer']",
+
+    # ── Popup / Modal / Cookie notice ─────────────────────
+    "[class*='popup']",
+    "[class*='modal']",
+    "[class*='cookie']",
+    "[class*='gdpr']",
+    "[class*='consent']",
+
+    # ── Misc noise ─────────────────────────────────────────
+    "[class*='print']",
+    "[class*='feedback']",
+    "[class*='survey']",
+    "[class*='promo']",
+    "noscript",
 ]
 
 BLOCK_TAGS = {
@@ -71,7 +148,3 @@ TAG_MAP = {
     "h5": "h4",
     "h6": "h4",
 }
-
-
-
-
