@@ -2,10 +2,11 @@ import httpx
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from .constants import telegraph
+from IslamSite.constants import telegraph
 
 # Local module
-from .html_cleaner import clean_html
+from IslamSite.html_cleaner import clean_html
+from IslamSite.constants import 
 
 
 
