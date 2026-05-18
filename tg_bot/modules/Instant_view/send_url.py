@@ -2,12 +2,12 @@ import httpx
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from tg_bot.modules.Instant_view.IslamSite.constants import telegraph
+from modules.Instant_view.IslamSite.constants import telegraph
 
 # Local module
-#tg_bot/modules/Instant_view/send_url.py
-from tg_bot.modules.Instant_view.IslamSite.html_cleaner import clean_html
-from tg_bot.modules.Instant_view.IslamSite.constants import HEADERS
+#modules/Instant_view/send_url.py
+from modules.Instant_view.IslamSite.html_cleaner import clean_html
+from modules.Instant_view.IslamSite.constants import HEADERS
 
 
 
