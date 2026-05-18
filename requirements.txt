@@ -15,6 +15,7 @@ aiohttp
 #Rss
 
 #rss
+lxml
 #python-telegram-bot[job-queue]
 motor
 
