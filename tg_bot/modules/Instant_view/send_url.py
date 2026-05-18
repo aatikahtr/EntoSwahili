@@ -9,14 +9,21 @@ from modules.Instant_view.IslamSite.html_cleaner import clean_html
 from modules.Instant_view.IslamSite.constants import HEADERS
 
 
-
-
 def is_url(text: str) -> bool:
     return text.startswith("http://") or text.startswith("https://")
 
 
-def detect_platform(soup: BeautifulSoup, url: str):
-    """Gundua platform kutoka kwa meta tags au URL."""
+def detect_platform(url: str, soup: BeautifulSoup) -> str:
+    """Gundua platform kutoka URL na meta tags."""
+    if "firqatunnajia.com" in url:
+        return "firqatunnajia"
+    if "gsmarena.com" in url:
+        return "gsmarena"
+    if "medium.com" in url:
+        return "medium"
+    if "substack.com" in url:
+        return "substack"
+
     generator = soup.find("meta", attrs={"name": "generator"})
     gen_content = (generator.get("content", "") if generator else "").lower()
 
@@ -28,74 +35,135 @@ def detect_platform(soup: BeautifulSoup, url: str):
         return "blogger"
     if "drupal" in gen_content:
         return "drupal"
-    if "medium.com" in url:
-        return "medium"
-    if "substack.com" in url:
-        return "substack"
-    # TRT Afrika na TRT World
-    if "trtafrika.com" in url or "trtworld.com" in url:
-        return "trtafrika"
 
     return "generic"
 
 
+def get_selectors(platform: str) -> list[str]:
+    """Rudisha selectors kulingana na platform."""
+    selectors_map = {
+        "firqatunnajia": [
+            ".elementor-widget-theme-post-content .elementor-widget-container",
+        ],
+        "gsmarena": [
+            "#specs-list",
+            ".specs-cp-wrapper",
+            ".review-body",
+            "article",
+        ],
+        "wordpress": [
+            ".entry-content",
+            ".post-content",
+            "article .content",
+            "article",
+        ],
+        "blogger": [
+            ".post-body",
+            ".entry-content",
+            "#post-body",
+            "article",
+        ],
+        "drupal": [
+            ".field-name-body .field-item",
+            ".field-items",
+            ".field-item",
+            ".node__content",
+            "#main-content",
+            ".region-content",
+        ],
+        "medium": [
+            "article",
+            ".meteredContent",
+            "section",
+        ],
+        "substack": [
+            ".body.markup",
+            ".available-content",
+            "article",
+        ],
+        "generic": [
+            "article",
+            ".entry-content",
+            ".post-content",
+            ".article-content",
+            "main article",
+            ".single-content",
+            "#content article",
+            ".content-area article",
+            ".site-content article",
+            "main",
+        ],
+    }
+    return selectors_map.get(platform, selectors_map["generic"])
 
 
+def find_content(soup: BeautifulSoup, selectors: list[str]):
+    """Tafuta element ya kwanza inayopatikana kutoka selectors."""
+    for selector in selectors:
+        el = soup.select_one(selector)
+        if el:
+            return el
+    return soup.find("body")
 
-#=======
-# Command
-#=======
 
 async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     original_message = update.message
 
     if not context.args:
-        await original_message.reply_text("⚠️ Toa URL 🔗. Mfano: /get https://example.com")
+        await original_message.reply_text(
+            "⚠️ Toa URL 🔗. Mfano: /get https://example.com"
+        )
         return
 
     url = context.args[0]
 
     if not is_url(url):
-        await original_message.reply_text("⚠️ URL si sahihi. Lazima ianze na http:// au https://")
+        await original_message.reply_text(
+            "⚠️ URL si sahihi. Lazima ianze na http:// au https://"
+        )
         return
 
     try:
-        async with httpx.AsyncClient(headers=HEADERS, timeout=30, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            headers=HEADERS,
+            follow_redirects=True,
+            timeout=30,
+        ) as client:
             response = await client.get(url)
             response.raise_for_status()
-            soup = BeautifulSoup(response.text, "html.parser")
 
-        # Pata title
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Title
         h1 = soup.find("h1")
-        title = h1.get_text().strip() if h1 else "Habari"
+        title = h1.get_text(strip=True) if h1 else "Habari"
 
-        # Gundua platform na pata content
-        platform = detect_platform(soup, url)
-        selectors = get_content_selectors(platform)
-        content_el = find_content_element(soup, selectors)
+        # Gundua platform na pata selectors
+        platform = detect_platform(url, soup)
+        selectors = get_selectors(platform)
+
+        # Pata content element
+        content_el = find_content(soup, selectors)
 
         if not content_el:
             await original_message.reply_text("⚠️ Imeshindwa kupata content.")
             return
 
-        html_content = clean_html(str(content_el), base_url=url)
-
-        # ✅ TRT Afrika: kata sehemu za related posts na vitu vya ziada
-        if platform == "trtafrika":
-            html_content = cut_trtafrika_noise(html_content)
+        body_html = content_el.decode_contents()
+        html_content = clean_html(body_html, base_url=url)
 
         if not html_content.strip():
             await original_message.reply_text("⚠️ Imeshindwa kupata content.")
             return
 
-        # Funga tags zilizo wazi
-        soup_fix = BS(html_content, "html.parser")
-        html_content = soup_fix.decode_contents()
-
         if len(html_content.encode("utf-8")) > 64000:
             html_content = html_content[:60000] + "<p>... (imekatwa)</p>"
 
-        page_data = await telegraph.create_page(title=title, html_content=html_content)
+        page_data = await telegraph.create_page(
+            title=title,
+            html_content=html_content,
+        )
+
         telegraph_url = f"https://telegra.ph/{page_data['path']}"
 
         await original_message.reply_text(
@@ -105,7 +173,15 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             disable_web_page_preview=False,
         )
 
-    except httpx.HTTPError as e:
-        await original_message.reply_text(f"❌ Hitilafu ya mtandao: {e}")
+    except httpx.HTTPStatusError as e:
+        await original_message.reply_text(
+            f"❌ Server ilikataa ombi: {e.response.status_code}"
+        )
+    except httpx.RequestError as e:
+        await original_message.reply_text(
+            f"❌ Hitilafu ya mtandao:\n{e}"
+        )
     except Exception as e:
-        await original_message.reply_text(f"❌ Hitilafu: {e}")
+        await original_message.reply_text(
+            f"❌ Hitilafu kwenye get_command.py:\n{e}"
+        )
