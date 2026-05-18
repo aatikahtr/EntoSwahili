@@ -5,8 +5,8 @@ from telegram.ext import ContextTypes
 from IslamSite.constants import telegraph
 
 # Local module
-from IslamSite.html_cleaner import clean_html
-from IslamSite.constants import HEADERS
+from .IslamSite.html_cleaner import clean_html
+from .IslamSite.constants import HEADERS
 
 
 
