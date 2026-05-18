@@ -1,5 +1,10 @@
 '''
-
+kusafisha HTML — yaani kuondoa vitu visivyohitajika kwenye code ya HTML kama:
+tags zisizo muhimu
+scripts
+matangazo
+styles zisizohitajika
+formatting chafu
 
 '''
 
