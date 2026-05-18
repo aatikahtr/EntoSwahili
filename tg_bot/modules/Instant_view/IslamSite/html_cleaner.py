@@ -8,6 +8,8 @@ formatting chafu
 
 '''
 
+from .clean_node import process_node
+
 
 def clean_html(html: str, base_url: str) -> str:
     html = re.sub(r'<\?xml[^>]*\?>', '', html)
