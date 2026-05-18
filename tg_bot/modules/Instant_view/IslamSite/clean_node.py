@@ -20,6 +20,9 @@ empty nodes
 
 '''
 
+from .table_converter import convert_table_to_telegraph
+
+
 def is_noise_text(text: str) -> bool:
     """Angalia kama text ni noise/boilerplate."""
     cleaned = text.strip().lower()
