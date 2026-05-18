@@ -1,13 +1,15 @@
 import httpx
+from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup as BS
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from modules.Instant_view.IslamSite.constants import telegraph
-
-# Local module
-#modules/Instant_view/send_url.py
 from modules.Instant_view.IslamSite.html_cleaner import clean_html
 from modules.Instant_view.IslamSite.constants import HEADERS
+
+
+
 
 def is_url(text: str) -> bool:
     return text.startswith("http://") or text.startswith("https://")
