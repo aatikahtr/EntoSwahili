@@ -14,7 +14,7 @@ from .IslamSite.constants import HEADERS
 # Command
 #=======
 
-async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     original_message = update.message
 
     if not context.args:
