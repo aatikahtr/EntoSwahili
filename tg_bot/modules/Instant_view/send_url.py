@@ -5,8 +5,9 @@ from telegram.ext import ContextTypes
 from IslamSite.constants import telegraph
 
 # Local module
-from IslamSite.html_cleaner import clean_html
-from IslamSite.constants import HEADERS
+#tg_bot/modules/Instant_view/send_url.py
+from tg_bot.modules.Instant_view.IslamSite.html_cleaner import clean_html
+from tg_bot.modules.Instant_view.IslamSite.constants import HEADERS
 
 
 
