@@ -23,7 +23,7 @@ import re
 from bs4 import BeautifulSoup, NavigableString
 
 # Local modules
-from constants import NOISE_TEXTS
+from .constants import NOISE_TEXTS
 
 
 
