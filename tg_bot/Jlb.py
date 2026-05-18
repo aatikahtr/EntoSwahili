@@ -20,8 +20,14 @@ NOISE_TEXTS = {
     "no comments yet. be the first!",
     "write a comment",
     "post comment",
+    # TRT Afrika
+    "zilizopendekezwa",
+    "soma zaidi",
+    "sambaza",
+    "chanzo:",
+    "chanzo:aa",
+    "dk kusoma",
 }
-
 
 
 ALLOWED_TAGS = {
@@ -35,32 +41,31 @@ ALLOWED_TAGS = {
 UNWANTED_SELECTORS = [
     ".breadcrumb",
     "[class*='lg:hidden']",
-    
+
     # Drupal sidebar na chini
     ".grid_4",
     ".sharedaddy",
-    
+
     # Related posts
     "[class*='related']",
-    
+
     # Navigation prev/next
     ".post-navigation",
-    
+
     # Sidebar / widgets
     ".widget",
     ".sidebar",
-    
+
     # Elementor extras
     ".elementor-share-btn",
     "[class*='social']",
-    
+
     # Copy button area (firqatunnajia specific)
     ".wp-block-buttons",
-    
-    # Comments
-    "#comments",                   # ✅ Ongeza - comments section
-]
 
+    # Comments
+    "#comments",
+]
 
 
 def is_url(text: str) -> bool:
@@ -84,25 +89,40 @@ def detect_platform(soup: BeautifulSoup, url: str):
         return "medium"
     if "substack.com" in url:
         return "substack"
+    # TRT Afrika na TRT World
+    if "trtafrika.com" in url or "trtworld.com" in url:
+        return "trtafrika"
+
     return "generic"
 
 
 def get_content_selectors(platform: str):
     selectors = {
-        "wordpress": [".elementor-widget-theme-post-content .elementor-widget-container", ".entry-content", ".post-content", "article .content", "article"],
-        "blogger":   [".post-body", ".entry-content", "#post-body", "article"],
-        
+        "wordpress": [
+            ".elementor-widget-theme-post-content .elementor-widget-container",
+            ".entry-content",
+            ".post-content",
+            "article .content",
+            "article",
+        ],
+        "blogger": [".post-body", ".entry-content", "#post-body", "article"],
         "drupal": [
-    ".field-name-body .field-item",  # ✅ Content tu - bila chochote kingine
-    ".field-name-body",
-    ".node__content",
-    "#main-content",
-    ".region-content",
-],
-        
-        "medium":    ["article", ".meteredContent", "section"],
-        "substack":  [".body.markup", ".available-content", "article"],
-        "generic":   [
+            ".field-name-body .field-item",
+            ".field-name-body",
+            ".node__content",
+            "#main-content",
+            ".region-content",
+        ],
+        "medium":   ["article", ".meteredContent", "section"],
+        "substack": [".body.markup", ".available-content", "article"],
+        # TRT Afrika — Next.js custom CMS
+        "trtafrika": [
+            "main",
+            "[class*='article']",
+            "[class*='content']",
+            "body",
+        ],
+        "generic": [
             "article", ".entry-content", ".post-content", ".article-content",
             "main article", ".single-content", "#content article",
             ".content-area article", ".site-content article", "main",
@@ -125,9 +145,9 @@ def clean_html(html: str, base_url: str) -> str:
     # Futa XML kwanza kabla BeautifulSoup haijasoma
     html = re.sub(r'<\?xml[^>]*\?>', '', html)
     html = re.sub(r'<xml[^>]*>.*?</xml>', '', html, flags=re.DOTALL)
-    
+
     soup = BeautifulSoup(html, "html.parser")
-    
+
     # 1. Futa sections zote zisizohitajika kwanza
     for selector in UNWANTED_SELECTORS:
         for tag in soup.select(selector):
@@ -137,7 +157,6 @@ def clean_html(html: str, base_url: str) -> str:
         if "lg:hidden" in tag.get("class", []):
             tag.decompose()
 
-    
     # 2. Ondoa tags zisizohitajika
     for tag in soup.find_all(True):
         if tag.name and tag.name.lower() in {
@@ -208,14 +227,32 @@ def clean_html(html: str, base_url: str) -> str:
             if plain and plain not in NOISE_TEXTS and len(plain) > 10:
                 parts.append(cleaned)
 
-    
     final = "".join(parts)
     soup_fix = BeautifulSoup(final, "html.parser")
     return soup_fix.decode_contents()
 
 
+def cut_trtafrika_noise(html_content: str) -> str:
+    """
+    TRT Afrika haina class ya kutenganisha related posts.
+    Tunakata content mara tu tunapoona alama za mwisho wa makala.
+    """
+    markers = [
+        "ZILIZOPENDEKEZWA",
+        "CHANZO:",
+        "Soma zaidi",
+        "chanzo:aa",
+    ]
+    for marker in markers:
+        idx = html_content.find(marker)
+        if idx != -1:
+            html_content = html_content[:idx]
+            break
+    return html_content
+
+
 #=======
-# Commmand
+# Command
 #=======
 
 async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -252,6 +289,10 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         html_content = clean_html(str(content_el), base_url=url)
 
+        # ✅ TRT Afrika: kata sehemu za related posts na vitu vya ziada
+        if platform == "trtafrika":
+            html_content = cut_trtafrika_noise(html_content)
+
         if not html_content.strip():
             await original_message.reply_text("⚠️ Imeshindwa kupata content.")
             return
@@ -277,10 +318,3 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await original_message.reply_text(f"❌ Hitilafu ya mtandao: {e}")
     except Exception as e:
         await original_message.reply_text(f"❌ Hitilafu: {e}")
-
-
-
-
-
-
-        
