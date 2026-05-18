@@ -6,6 +6,8 @@ from telegraph.aio import Telegraph
 from bs4 import BeautifulSoup, NavigableString, Tag, Comment
 from urllib.parse import urljoin
 
+from .html_cleaner import clean_html
+
 
 
 def is_url(text: str) -> bool:
