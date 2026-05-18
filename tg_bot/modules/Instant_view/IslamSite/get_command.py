@@ -2,7 +2,7 @@
 from playwright.async_api import async_playwright
 from telegram import Update
 from telegram.ext import ContextTypes
-from telegraph.aio import Telegraph
+from .constants import telegraph
 
 # Local module
 from .html_cleaner import clean_html
