@@ -17,6 +17,7 @@ from telegram.ext import (
 #=========
 #Jalibio
 #==========
+from modules.Instant_view.send_url import send_command
 from modules.Instant_view.IslamSite import get_command
 
 #===========
@@ -98,6 +99,7 @@ async def main():
             filters=filters.ChatType.PRIVATE
         )
     )
+    app.add_handler(CommandHandler("link", send_command))
     
     
     app.add_handler(CommandHandler("check", check_selectors))
