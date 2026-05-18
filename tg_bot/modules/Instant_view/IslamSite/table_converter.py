@@ -17,6 +17,15 @@
     """
 
 
+
+def extract_cell_text(cell) -> str:
+    """Pata text safi kutoka td/th, safisha whitespace."""
+    return re.sub(r'\s+', ' ', cell.get_text(separator=" ", strip=True))
+
+
+
+
+
 def convert_to_telegraph(table_tag, base_url: str, soup: BeautifulSoup) -> list:
     
     result = []
