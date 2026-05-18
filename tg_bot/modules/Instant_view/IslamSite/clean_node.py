@@ -31,7 +31,7 @@ from bs4 import (
 
 from urllib.parse import urljoin
 
-from .table_converter import convert_to_telegraph
+from .table_converter import convert_to_telegraph  # ✅ jina sahihi
 from .constants import (
     NOISE_TEXTS,
     SKIP_TAGS,
@@ -163,7 +163,7 @@ def process_node(node, base_url: str, soup: BeautifulSoup) -> list:
 
     # 10. Table tags — special conversion
     if tag_name == "table":
-        return convert_table_to_telegraph(node, base_url, soup)
+        return convert_to_telegraph(node, base_url, soup)  # ✅ jina sahihi
 
     if tag_name in TABLE_TAGS:
         # thead/tbody/tr/td/th zinafika hapa tu kama ziko nje ya <table>
@@ -196,7 +196,3 @@ def process_node(node, base_url: str, soup: BeautifulSoup) -> list:
 
     # 12. Chochote kingine — unwrap, rudisha watoto tu
     return processed_children
-
-
-
-
