@@ -5,6 +5,7 @@ scripts
 matangazo
 styles zisizohitajika
 formatting chafu
+
 '''
 
 # Standard library
@@ -18,35 +19,13 @@ from .clean_node import process_node
 from .constants import UNWANTED_SELECTORS
 
 
-def remove_recommended_links(soup: BeautifulSoup) -> None:
-    """
-    Futa links za 'ZILIZOPENDEKEZWA' / related articles.
-    Zinatambuliwa kwa utm_campaign=recommended kwenye href.
-    Inafuta tag nzima ya <a> pamoja na mzazi wake kama mzazi
-    ana link moja tu (yaani ni wrapper tu).
-    """
-    for a_tag in soup.find_all("a", href=True):
-        href = a_tag.get("href", "")
-        if "utm_campaign=recommended" in href:
-            parent = a_tag.parent
-            # Kama mzazi ana watoto wengine zaidi ya link hii — futa link tu
-            siblings = [s for s in parent.children if str(s).strip()]
-            if len(siblings) <= 1:
-                parent.decompose()
-            else:
-                a_tag.decompose()
-
-
 def clean_html(html: str, base_url: str) -> str:
     html = re.sub(r'<\?xml[^>]*\?>', '', html)
     html = re.sub(r'<xml[^>]*>.*?</xml>', '', html, flags=re.DOTALL)
 
     soup = BeautifulSoup(html, "lxml")
 
-    # Futa recommended/related article links kwanza
-    remove_recommended_links(soup)
-
-    # Futa sections zisizohitajika
+    # Futa sections zisizohitajika kwanza
     for selector in UNWANTED_SELECTORS:
         for tag in soup.select(selector):
             tag.decompose()
