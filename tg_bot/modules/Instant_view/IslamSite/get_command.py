@@ -1,4 +1,5 @@
-from playwright.async_api import async_playwright
+import asyncio
+from playwright.async_api import async_playwright, Browser, BrowserContext
 from bs4 import BeautifulSoup
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -11,18 +12,44 @@ from modules.Instant_view.platform_handler import (
     cleanup_platform,
 )
 
-# ✅ Browser moja inayoendelea - haianzishi upya kila request
-_browser = None
-_playwright = None
+# ============================================
+# GLOBALS
+# ============================================
 
-async def get_browser():
+_browser: Browser | None = None
+_playwright = None
+_browser_lock = asyncio.Lock()
+
+SEMAPHORE = asyncio.Semaphore(3)
+
+
+# ============================================
+# BROWSER MANAGER
+# ============================================
+
+async def get_browser() -> Browser:
     global _browser, _playwright
-    if _browser is None or not _browser.is_connected():
+
+    # Lock inazuia browser mbili kuzinduliwa wakati mmoja
+    async with _browser_lock:
+        # ✅ Njia sahihi ya kuangalia browser ipo
+        if _browser is not None and _browser.is_connected():
+            return _browser
+
+        # Funga playwright ya zamani kwanza
+        if _playwright is not None:
+            try:
+                await _playwright.stop()
+            except Exception:
+                pass
+
         _playwright = await async_playwright().start()
+
         _browser = await _playwright.chromium.launch(
             headless=True,
             args=[
                 "--no-sandbox",
+                "--disable-setuid-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
                 "--disable-extensions",
@@ -31,121 +58,171 @@ async def get_browser():
                 "--no-first-run",
             ],
         )
+
     return _browser
 
+
+# ============================================
+# HELPERS
+# ============================================
 
 def is_url(text: str) -> bool:
     return text.startswith("http://") or text.startswith("https://")
 
 
+async def block_resources(route):
+    blocked = {"image", "media", "font", "stylesheet"}
+    if route.request.resource_type in blocked:
+        await route.abort()
+    else:
+        await route.continue_()
+
+
+# ============================================
+# MAIN COMMAND
+# ============================================
+
 async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    original_message = update.message
+    async with SEMAPHORE:
+        original_message = update.message
 
-    if not context.args:
-        await original_message.reply_text(
-            "⚠️ Toa URL 🔗. Mfano: /get https://example.com"
-        )
-        return
+        # ====================================
+        # CHECK URL
+        # ====================================
 
-    url = context.args[0]
+        if not context.args:
+            await original_message.reply_text(
+                "⚠️ Toa URL 🔗\n\nMfano:\n/get https://example.com"
+            )
+            return
 
-    if not is_url(url):
-        await original_message.reply_text(
-            "⚠️ URL si sahihi. Lazima ianze na http:// au https://"
-        )
-        return
+        url = context.args[0].strip()
 
-    page = None
-    try:
-        browser = await get_browser()
+        if not is_url(url):
+            await original_message.reply_text(
+                "⚠️ URL si sahihi.\n\nLazima ianze na:\n- http://\n- https://"
+            )
+            return
 
-        # ✅ Context mpya kwa kila request (isolation) lakini browser ni moja
-        ctx = await browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            java_script_enabled=True,
-            bypass_csp=True,
-        )
-
-        # ✅ Block resources zisizo muhimu - inaokoa RAM na muda
-        await ctx.route(
-            "**/*",
-            lambda route: route.abort()
-            if route.request.resource_type in ["image", "font", "media", "stylesheet"]
-            else route.continue_(),
-        )
-
-        page = await ctx.new_page()
+        ctx: BrowserContext | None = None
 
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=20000)
-            # ✅ Punguza wait - sekunde 1 inatosha mara nyingi
-            await page.wait_for_timeout(1000)
-        except Exception:
-            await page.goto(url, wait_until="load", timeout=30000)
+            # ====================================
+            # BROWSER + CONTEXT
+            # ====================================
 
-        # Title
-        h1 = await page.query_selector("h1")
-        title = (await h1.inner_text()).strip() if h1 else "Habari"
+            browser = await get_browser()
 
-        full_html = await page.content()
-        soup_detect = BeautifulSoup(full_html, "html.parser")
-        platform = detect_platform(url, soup_detect)
-        selectors = get_selectors(platform)
+            ctx = await browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0 Safari/537.36"
+                ),
+                java_script_enabled=True,
+                bypass_csp=True,
+                viewport={"width": 1280, "height": 720},
+            )
 
-        content_el = None
-        for selector in selectors:
-            el = await page.query_selector(selector)
-            if el:
-                content_el = el
-                break
+            await ctx.route("**/*", block_resources)
+            page = await ctx.new_page()
+            page.set_default_timeout(20000)
 
-        if not content_el:
-            content_el = await page.query_selector("body")
+            # ====================================
+            # OPEN URL
+            # ====================================
 
-        if not content_el:
-            await ctx.close()
-            await original_message.reply_text("⚠️ Imeshindwa kupata content.")
-            return
-
-        body_html = await content_el.inner_html()
-
-        # ✅ Funga context (si browser!) baada ya kupata data
-        await ctx.close()
-
-        # Processing
-        content_soup = BeautifulSoup(body_html, "html.parser")
-        cleanup_platform(platform, content_soup)
-        body_html = content_soup.decode_contents()
-
-        html_content = clean_html(body_html, base_url=url)
-
-        if not html_content.strip():
-            await original_message.reply_text("⚠️ Imeshindwa kupata content.")
-            return
-
-        if len(html_content.encode("utf-8")) > 64000:
-            html_content = html_content[:60000] + "<p>... (imekatwa)</p>"
-
-        page_data = await telegraph.create_page(
-            title=title,
-            html_content=html_content,
-        )
-
-        telegraph_url = f"https://telegra.ph/{page_data['path']}"
-
-        await original_message.reply_text(
-            f"📄 <b>{title}</b>\n\n"
-            f"🔗 <a href='{telegraph_url}'>Soma hapa (Instant View)</a>",
-            parse_mode="HTML",
-            disable_web_page_preview=False,
-        )
-
-    except Exception as e:
-        if page:
             try:
-                await page.context.close()
+                await page.goto(url, wait_until="domcontentloaded", timeout=20000)
+                await page.wait_for_selector("body", timeout=5000)
             except Exception:
-                pass
-        await original_message.reply_text(
-            f"❌ Hitilafu kwenye get_command.py:\n{e}"
-        )
+                await page.goto(url, wait_until="load", timeout=30000)
+
+            # ====================================
+            # TITLE
+            # ====================================
+
+            title = "Habari"
+            try:
+                h1 = page.locator("h1").first
+                text = await h1.text_content(timeout=3000)
+                if text and text.strip():
+                    title = text.strip()
+            except Exception:
+                try:
+                    page_title = await page.title()
+                    if page_title.strip():
+                        title = page_title.strip()
+                except Exception:
+                    pass
+
+            # ====================================
+            # PLATFORM + CONTENT
+            # ====================================
+
+            full_html = await page.content()
+            soup_detect = BeautifulSoup(full_html, "lxml")
+            platform = detect_platform(url, soup_detect)
+            selectors = get_selectors(platform)
+
+            content_el = None
+            for selector in selectors:
+                try:
+                    el = await page.query_selector(selector)
+                    if el:
+                        content_el = el
+                        break
+                except Exception:
+                    continue
+
+            if not content_el:
+                content_el = await page.query_selector("body")
+
+            if not content_el:
+                await original_message.reply_text("⚠️ Imeshindwa kupata content.")
+                return
+
+            body_html = await content_el.inner_html()
+
+            # ====================================
+            # PROCESS + SEND
+            # ====================================
+
+            content_soup = BeautifulSoup(body_html, "lxml")
+            cleanup_platform(platform, content_soup)
+            body_html = content_soup.decode_contents()
+
+            html_content = clean_html(body_html, base_url=url)
+
+            if not html_content.strip():
+                await original_message.reply_text("⚠️ Imeshindwa kupata content.")
+                return
+
+            if len(html_content.encode("utf-8")) > 64000:
+                html_content = html_content[:60000] + "<p>... (imekatwa)</p>"
+
+            page_data = await telegraph.create_page(
+                title=title,
+                html_content=html_content,
+            )
+
+            telegraph_url = f"https://telegra.ph/{page_data['path']}"
+
+            await original_message.reply_text(
+                f"📄 <b>{title}</b>\n\n"
+                f"🔗 <a href='{telegraph_url}'>Soma hapa (Instant View)</a>",
+                parse_mode="HTML",
+                disable_web_page_preview=False,
+            )
+
+        except Exception as e:
+            await original_message.reply_text(
+                f"❌ Hitilafu kwenye get_command.py:\n{e}"
+            )
+
+        finally:
+            if ctx:
+                try:
+                    await ctx.close()
+                except Exception:
+                    pass
