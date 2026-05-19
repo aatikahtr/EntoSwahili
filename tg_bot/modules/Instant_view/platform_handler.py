@@ -129,6 +129,25 @@ def remove_trtafrika_recommended(article_el) -> None:
             parent = parent.parent
 
 
+def remove_trtafrika_soma_zaidi(article_el) -> None:
+    """
+    Futa sehemu ya 'Soma zaidi' ndani ya article ya TRT Afrika.
+    Inatambuliwa kwa text 'Soma zaidi', kisha inafuta container yake
+    pamoja na kila kitu kinachofuata baada yake.
+    """
+    for tag in article_el.find_all(string=lambda t: t and "soma zaidi" in t.lower()):
+        parent = tag.parent
+        while parent and parent != article_el:
+            if parent.name in {"div", "section", "aside", "ul", "ol", "h2", "h3", "h4"}:
+                # Futa siblings zote zinazofuata
+                for sibling in list(parent.find_next_siblings()):
+                    sibling.decompose()
+                # Futa container yenyewe
+                parent.decompose()
+                break
+            parent = parent.parent
+
+
 def cleanup_platform(platform: str, content_el) -> None:
     """
     Fanya cleanup maalum kulingana na platform.
@@ -136,3 +155,4 @@ def cleanup_platform(platform: str, content_el) -> None:
     """
     if platform == "trtafrika":
         remove_trtafrika_recommended(content_el)
+        remove_trtafrika_soma_zaidi(content_el)
