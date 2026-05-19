@@ -48,7 +48,7 @@ def get_selectors(platform: str) -> list[str]:
             
             #".tiptap.ProseMirror",
             #".ProseMirror",
-            "[class*='trt-article-body']",
+            #"[class*='trt-article-body']",
             "article",
         ],
         "firqatunnajia": [
