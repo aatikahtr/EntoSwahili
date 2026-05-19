@@ -17,7 +17,7 @@ def is_url(text: str) -> bool:
     return text.startswith("http://") or text.startswith("https://")
 
 
-async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     original_message = update.message
 
     if not context.args:
@@ -97,5 +97,5 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         await original_message.reply_text(
-            f"❌ Hitilafu kwenye get_command.py:\n{e}"
+            f"❌ Hitilafu kwenye send_command.py:\n{e}"
         )
