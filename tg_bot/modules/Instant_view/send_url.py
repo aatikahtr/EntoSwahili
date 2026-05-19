@@ -3,113 +3,21 @@ from bs4 import BeautifulSoup
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from modules.Instant_view.IslamSite.constants import telegraph
+from modules.Instant_view.IslamSite.constants import telegraph, HEADERS
 from modules.Instant_view.IslamSite.html_cleaner import clean_html
-from modules.Instant_view.IslamSite.constants import HEADERS
+from modules.Instant_view.IslamSite.platform_handler import (
+    detect_platform,
+    get_selectors,
+    find_content,
+    cleanup_platform,
+)
 
 
 def is_url(text: str) -> bool:
     return text.startswith("http://") or text.startswith("https://")
 
 
-def detect_platform(url: str, soup: BeautifulSoup) -> str:
-    """Gundua platform kutoka URL na meta tags."""
-    if "trtafrika.com" in url:
-        return "trtafrika"
-    if "firqatunnajia.com" in url:
-        return "firqatunnajia"
-    if "gsmarena.com" in url:
-        return "gsmarena"
-    if "medium.com" in url:
-        return "medium"
-    if "substack.com" in url:
-        return "substack"
-
-    generator = soup.find("meta", attrs={"name": "generator"})
-    gen_content = (generator.get("content", "") if generator else "").lower()
-
-    if "wordpress" in gen_content or "elementor" in gen_content:
-        return "wordpress"
-    if soup.find("link", attrs={"rel": "https://api.w.org/"}):
-        return "wordpress"
-    if "blogger" in gen_content:
-        return "blogger"
-    if "drupal" in gen_content:
-        return "drupal"
-
-    return "generic"
-
-
-def get_selectors(platform: str) -> list[str]:
-    """Rudisha selectors kulingana na platform."""
-    selectors_map = {
-        # TRT Afrika — chagua article body moja kwa moja (ProseMirror editor)
-        "trtafrika": ["article"],
-        "firqatunnajia": [
-            ".elementor-widget-theme-post-content .elementor-widget-container",
-        ],
-        "gsmarena": [
-            "#specs-list",
-            ".specs-cp-wrapper",
-            ".review-body",
-            "article",
-        ],
-        "wordpress": [
-            ".entry-content",
-            ".post-content",
-            "article .content",
-            "article",
-        ],
-        "blogger": [
-            ".post-body",
-            ".entry-content",
-            "#post-body",
-            "article",
-        ],
-        "drupal": [
-            ".field-name-body .field-item",
-            ".field-items",
-            ".field-item",
-            ".node__content",
-            "#main-content",
-            ".region-content",
-        ],
-        "medium": [
-            "article",
-            ".meteredContent",
-            "section",
-        ],
-        "substack": [
-            ".body.markup",
-            ".available-content",
-            "article",
-        ],
-        "generic": [
-            "article",
-            ".entry-content",
-            ".post-content",
-            ".article-content",
-            "main article",
-            ".single-content",
-            "#content article",
-            ".content-area article",
-            ".site-content article",
-            "main",
-        ],
-    }
-    return selectors_map.get(platform, selectors_map["generic"])
-
-
-def find_content(soup: BeautifulSoup, selectors: list[str]):
-    """Tafuta element ya kwanza inayopatikana kutoka selectors."""
-    for selector in selectors:
-        el = soup.select_one(selector)
-        if el:
-            return el
-    return soup.find("body")
-
-
-async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     original_message = update.message
 
     if not context.args:
@@ -152,6 +60,9 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await original_message.reply_text("⚠️ Imeshindwa kupata content.")
             return
 
+        # Cleanup maalum ya platform
+        cleanup_platform(platform, content_el)
+
         body_html = content_el.decode_contents()
         html_content = clean_html(body_html, base_url=url)
 
@@ -186,5 +97,5 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         await original_message.reply_text(
-            f"❌ Hitilafu kwenye send_url.py:\n{e}"
+            f"❌ Hitilafu kwenye get_command.py:\n{e}"
         )
