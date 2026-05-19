@@ -45,7 +45,8 @@ def get_selectors(platform: str) -> list[str]:
     selectors_map = {
         # TRT Afrika — chagua article body moja kwa moja (ProseMirror editor)
         "trtafrika": [
-            ".tiptap.ProseMirror",
+            
+            #".tiptap.ProseMirror",
             ".ProseMirror",
             ".trt-article-body-wrapper-with",
             "[class*='trt-article-body']",
@@ -192,5 +193,5 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         await original_message.reply_text(
-            f"❌ Hitilafu kwenye get_command.py:\n{e}"
+            f"❌ Hitilafu kwenye send_url.py:\n{e}"
         )
