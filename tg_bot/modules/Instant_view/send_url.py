@@ -9,7 +9,7 @@ from modules.Instant_view.IslamSite.html_cleaner import clean_html
 from .platform_handler import detect_platform, get_selectors, find_content, cleanup_platform
 
 # Import browser manager kutoka get_command.py yako
-from modules.Instant_view.get_command import get_browser, block_resources
+from modules.Instant_view.IslamSite.get_command import get_browser, block_resources
 
 SEMAPHORE = asyncio.Semaphore(5)
 
