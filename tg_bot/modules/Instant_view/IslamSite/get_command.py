@@ -1,4 +1,3 @@
-
 from playwright.async_api import async_playwright
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -52,6 +51,7 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             title = (await h1.inner_text()).strip() if h1 else "Habari"
 
             # Gundua platform
+            is_trtafrika = "trtafrika.com" in url
             is_firqatunnajia = "firqatunnajia.com" in url
             is_gsmarena = "gsmarena.com" in url
             is_wordpress = await page.query_selector(
@@ -70,7 +70,15 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             is_substack = "substack.com" in url
 
             # Selectors kulingana na platform
-            if is_firqatunnajia:
+            if is_trtafrika:
+                content_selectors = [
+                    ".tiptap.ProseMirror",
+                    ".ProseMirror",
+                    ".trt-article-body-wrapper-with",
+                    "[class*='trt-article-body']",
+                    "article",
+                ]
+            elif is_firqatunnajia:
                 content_selectors = [
                     ".elementor-widget-theme-post-content .elementor-widget-container",
                 ]
