@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes
 
 from modules.Instant_view.IslamSite.constants import telegraph, HEADERS
 from modules.Instant_view.IslamSite.html_cleaner import clean_html
-from modules.Instant_view.IslamSite.platform_handler import (
+from .platform_handler import (
     detect_platform,
     get_selectors,
     find_content,
