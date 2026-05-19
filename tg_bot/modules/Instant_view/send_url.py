@@ -44,13 +44,7 @@ def get_selectors(platform: str) -> list[str]:
     """Rudisha selectors kulingana na platform."""
     selectors_map = {
         # TRT Afrika — chagua article body moja kwa moja (ProseMirror editor)
-        "trtafrika": [
-            
-            #".tiptap.ProseMirror",
-            #".ProseMirror",
-            #"[class*='trt-article-body']",
-            "article",
-        ],
+        "trtafrika": ["article"],
         "firqatunnajia": [
             ".elementor-widget-theme-post-content .elementor-widget-container",
         ],
