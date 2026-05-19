@@ -1,6 +1,5 @@
 import httpx
 from bs4 import BeautifulSoup
-from bs4 import BeautifulSoup as BS
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -15,6 +14,8 @@ def is_url(text: str) -> bool:
 
 def detect_platform(url: str, soup: BeautifulSoup) -> str:
     """Gundua platform kutoka URL na meta tags."""
+    if "trtafrika.com" in url:
+        return "trtafrika"
     if "firqatunnajia.com" in url:
         return "firqatunnajia"
     if "gsmarena.com" in url:
@@ -42,6 +43,14 @@ def detect_platform(url: str, soup: BeautifulSoup) -> str:
 def get_selectors(platform: str) -> list[str]:
     """Rudisha selectors kulingana na platform."""
     selectors_map = {
+        # TRT Afrika — chagua article body moja kwa moja (ProseMirror editor)
+        "trtafrika": [
+            ".tiptap.ProseMirror",
+            ".ProseMirror",
+            ".trt-article-body-wrapper-with",
+            "[class*='trt-article-body']",
+            "article",
+        ],
         "firqatunnajia": [
             ".elementor-widget-theme-post-content .elementor-widget-container",
         ],
