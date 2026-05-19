@@ -48,7 +48,6 @@ def get_selectors(platform: str) -> list[str]:
             
             #".tiptap.ProseMirror",
             #".ProseMirror",
-            ".trt-article-body-wrapper-with",
             "[class*='trt-article-body']",
             "article",
         ],
