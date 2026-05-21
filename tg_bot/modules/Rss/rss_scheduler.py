@@ -53,7 +53,7 @@ async def check_all_subscriptions(app: Application):
                     text=(
                         f"🆕 <b>{site_name}</b>\n\n"
                         f"📰 {post['title']}\n\n"
-                        f"🔗 <a href='{post['link']}'>Soma zaidi</a>"
+                        f"{post['link']}"
                     ),
                     parse_mode="HTML",
                     disable_web_page_preview=False,
