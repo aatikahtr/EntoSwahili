@@ -113,6 +113,7 @@ async def main():
     app.add_handler(CommandHandler("check", check_selectors))
     
         # ── Handlers ───────
+    
     app.add_handler(
     CommandHandler(
         "rss",
@@ -151,3 +152,27 @@ async def main():
     
     # Setup webhook server
     starlette_app = Starlette(
+        routes=[Route("/telegram", telegram_webhook, methods=["POST"])]
+    )
+
+    server = uvicorn.Server(
+        uvicorn.Config(
+            app=starlette_app,
+            host="0.0.0.0",
+            port=PORT,
+            log_level="info"
+        )
+    )
+
+    # Set webhook
+    await app.bot.set_webhook(f"{URL}/telegram")
+
+    # Run application
+    async with app:
+        await app.start()
+        await server.serve()
+        await app.stop()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
