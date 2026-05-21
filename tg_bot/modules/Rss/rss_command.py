@@ -395,7 +395,7 @@ async def _check_and_send(chat_id: str, sub: dict, bot) -> int:
                 text=(
                     f"🆕 <b>{sub['name']}</b>\n\n"
                     f"📰 {post['title']}\n\n"
-                    f"🔗 <a href='{post['link']}'>Soma zaidi</a>"
+                    f"{post['link']}"
                 ),
                 parse_mode="HTML",
                 disable_web_page_preview=False,
