@@ -237,7 +237,7 @@ async def scrape_posts(url: str) -> tuple[str, list[dict]]:
 # ── Telegram Handlers ────────────────────────────────────────────────
 
 async def rss_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
+    msg = update.message or update.channel_post 
     chat_id = str(msg.chat_id)
     args = context.args
 
