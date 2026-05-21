@@ -237,12 +237,23 @@ async def scrape_posts(url: str) -> tuple[str, list[dict]]:
 # ── Telegram Handlers ────────────────────────────────────────────────
 
 async def rss_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message or update.channel_post 
+    msg = update.message or update.channel_post
+    if not msg:
+        return
+
     chat_id = str(msg.chat_id)
-    args = context.args
+
+    args = context.args or []
+    if not args and msg.text:
+        parts = msg.text.split()
+        args = parts[1:]
+
+    async def reply(text, **kwargs):
+        """Helper — inatumia send_message badala ya reply_text."""
+        return await context.bot.send_message(chat_id=chat_id, text=text, **kwargs)
 
     if not args:
-        await msg.reply_text(
+        await reply(
             "📡 <b>RSS Tracker</b>\n\n"
             "Amri zinazopatikana:\n"
             "• /rss <code>https://site.com</code> — Fuatilia site\n"
@@ -258,45 +269,45 @@ async def rss_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if subcommand == "list":
         subs = await get_user_subs(chat_id)
         if not subs:
-            await msg.reply_text("📭 Hufuatilii site yoyote bado.\n\nTumia /rss https://site.com kuanza.")
+            await reply("📭 Hufuatilii site yoyote bado.\n\nTumia /rss https://site.com kuanza.")
             return
         lines = ["📡 <b>Sites unazofuatilia:</b>\n"]
         for i, sub in enumerate(subs, 1):
             lines.append(f"{i}. <b>{sub['name']}</b>\n   <code>{sub['url']}</code>")
-        await msg.reply_text("\n".join(lines), parse_mode="HTML")
+        await reply("\n".join(lines), parse_mode="HTML")
         return
 
     if subcommand == "stop":
         if len(args) < 2:
-            await msg.reply_text("⚠️ Toa URL. Mfano: /rss stop https://site.com")
+            await reply("⚠️ Toa URL. Mfano: /rss stop https://site.com")
             return
         removed = await remove_subscription(chat_id, args[1])
         if removed:
-            await msg.reply_text(f"🛑 Umesimama kufuatilia:\n<code>{args[1]}</code>", parse_mode="HTML")
+            await reply(f"🛑 Umesimama kufuatilia:\n<code>{args[1]}</code>", parse_mode="HTML")
         else:
-            await msg.reply_text("⚠️ URL hiyo haipatikani kwenye orodha yako.")
+            await reply("⚠️ URL hiyo haipatikani kwenye orodha yako.")
         return
 
     if subcommand == "check":
         subs = await get_user_subs(chat_id)
         if not subs:
-            await msg.reply_text("📭 Hufuatilii site yoyote bado.")
+            await reply("📭 Hufuatilii site yoyote bado.")
             return
-        await msg.reply_text("🔄 Ninakagua updates...")
+        await reply("🔄 Ninakagua updates...")
         total = 0
         for sub in subs:
             total += await _check_and_send(chat_id, sub, bot=context.bot)
         if total == 0:
-            await msg.reply_text("✅ Hakuna updates mpya kwa sasa.")
+            await reply("✅ Hakuna updates mpya kwa sasa.")
         return
 
     # /rss <url>
     url = args[0]
     if not url.startswith(("http://", "https://")):
-        await msg.reply_text("⚠️ URL si sahihi. Lazima ianze na http:// au https://")
+        await reply("⚠️ URL si sahihi. Lazima ianze na http:// au https://")
         return
 
-    wait_msg = await msg.reply_text("🔄 Ninakagua site...")
+    wait_msg = await reply("🔄 Ninakagua site...")
 
     try:
         site_name, posts = await scrape_posts(url)
@@ -328,7 +339,6 @@ async def rss_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Tumia /rss list kuona orodha yako.",
         parse_mode="HTML",
     )
-
 
 async def _check_and_send(chat_id: str, sub: dict, bot) -> int:
     try:
