@@ -1,15 +1,12 @@
+
 from playwright.async_api import async_playwright
-from bs4 import BeautifulSoup
 from telegram import Update
 from telegram.ext import ContextTypes
-
 from .constants import telegraph
+
+# Local module
 from .html_cleaner import clean_html
-from modules.Instant_view.platform_handler import (
-    detect_platform,
-    get_selectors,
-    cleanup_platform,
-)
+
 
 
 def is_url(text: str) -> bool:
@@ -40,25 +37,102 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             )
 
+            # Tumia "domcontentloaded" — haraka zaidi, haingoji ads/trackers
+            # Kama ikishindwa, jaribu tena bila kusubiri sana
             try:
                 await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                # Subiri kidogo content ipakiwe (JS rendering)
                 await page.wait_for_timeout(2000)
             except Exception:
+                # Fallback: "load" event tu
                 await page.goto(url, wait_until="load", timeout=45000)
 
             # Title
             h1 = await page.query_selector("h1")
             title = (await h1.inner_text()).strip() if h1 else "Habari"
 
-            # Gundua platform kupitia platform_handler
-            full_html = await page.content()
-            soup_detect = BeautifulSoup(full_html, "html.parser")
-            platform = detect_platform(url, soup_detect)
-            selectors = get_selectors(platform)
+            # Gundua platform
+            is_firqatunnajia = "firqatunnajia.com" in url
+            is_gsmarena = "gsmarena.com" in url
+            is_wordpress = await page.query_selector(
+                "meta[name='generator'][content*='WordPress'], "
+                "meta[name='generator'][content*='Elementor'], "
+                "link[rel='https://api.w.org/']"
+            )
+            is_blogger = await page.query_selector(
+                "meta[name='generator'][content*='Blogger']"
+            )
+            is_drupal = await page.query_selector(
+                "meta[name='generator'][content*='Drupal'], "
+                "meta[name='Generator'][content*='Drupal']"
+            )
+            is_medium = "medium.com" in url
+            is_substack = "substack.com" in url
+
+            # Selectors kulingana na platform
+            if is_firqatunnajia:
+                content_selectors = [
+                    ".elementor-widget-theme-post-content .elementor-widget-container",
+                ]
+            elif is_gsmarena:
+                content_selectors = [
+                    "#specs-list",          # Specs table yenyewe
+                    ".specs-cp-wrapper",
+                    ".review-body",         # Kwa review pages
+                    "article",
+                ]
+            elif is_wordpress:
+                content_selectors = [
+                    ".entry-content",
+                    ".post-content",
+                    "article .content",
+                    "article",
+                ]
+            elif is_blogger:
+                content_selectors = [
+                    ".post-body",
+                    ".entry-content",
+                    "#post-body",
+                    "article",
+                ]
+            elif is_drupal:
+                content_selectors = [
+                    ".field-name-body .field-item",
+                    ".field-items",
+                    ".field-item",
+                    ".node__content",
+                    "#main-content",
+                    ".region-content",
+                ]
+            elif is_medium:
+                content_selectors = [
+                    "article",
+                    ".meteredContent",
+                    "section",
+                ]
+            elif is_substack:
+                content_selectors = [
+                    ".body.markup",
+                    ".available-content",
+                    "article",
+                ]
+            else:
+                content_selectors = [
+                    "article",
+                    ".entry-content",
+                    ".post-content",
+                    ".article-content",
+                    "main article",
+                    ".single-content",
+                    "#content article",
+                    ".content-area article",
+                    ".site-content article",
+                    "main",
+                ]
 
             # Pata content element
             content_el = None
-            for selector in selectors:
+            for selector in content_selectors:
                 el = await page.query_selector(selector)
                 if el:
                     content_el = el
@@ -74,11 +148,6 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             body_html = await content_el.inner_html()
             await browser.close()
-
-        # Cleanup maalum ya platform
-        content_soup = BeautifulSoup(body_html, "html.parser")
-        cleanup_platform(platform, content_soup)
-        body_html = content_soup.decode_contents()
 
         html_content = clean_html(body_html, base_url=url)
 
@@ -105,5 +174,5 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         await original_message.reply_text(
-            f"❌ Hitilafu kwenye get_command.py:\n{e}"
-        )
+    f"❌ Hitilafu kwenye get_command.py:\n{e}"
+)
