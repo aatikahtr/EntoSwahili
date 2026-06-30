@@ -1,5 +1,6 @@
 import os
 import asyncio
+import logging
 import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -16,44 +17,45 @@ from telegram.ext import (
 
 from modules.X_post.Waite import textzote
 
-#=========
-#Jalibio
-#==========
+# =========
+# Jalibio
+# =========
 from modules.Instant_view.send_url import send_command
 from modules.Instant_view.IslamSite import get_command
 
-#===========
+# ===========
 # Translate
-#===========
+# ===========
 from modules.Translate.trslate_update import trslate_message
 from modules.commands import start
 
-#==========
-# Instant View 
-#===============
+# ==========
+# Instant View
+# ==========
 from modules.Instant_view.instant_command import instant_view_command
 
-
-#=========
+# =========
 # Moja moja
-#==========
+# =========
 from modules.Mojamoja.moja1 import mojaone
 
-
-#=========
-#Check  Url
-#=========
+# =========
+# Check Url
+# =========
 from modules.selectors import check_selectors
 
-
-#============
-#Website to rss
-#=============
-
+# ============
+# Website to rss
+# ============
 from modules.Rss.rss_command import rss_command
 from modules.Rss.rss_scheduler import setup_scheduler
 
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+logger = logging.getLogger(__name__)
 
 # Bot Configuration
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -63,105 +65,114 @@ PORT = int(os.getenv("PORT", 10000))
 # Groups zinazoruhusiwa
 ALLOWED_GROUPS = [-1001668363178, -1001669440207]
 
+# Channel maalum kwa textzote (X/Twitter URLs)
+X_TRANSLATE_CHANNEL = -1004358606228
+
 # Global application instance
-app = None
+app: Application | None = None
 
 
-async def telegram_webhook(request: Request):
+async def telegram_webhook(request: Request) -> Response:
     """Handle incoming webhook requests"""
-    data = await request.json()
-    await app.update_queue.put(Update.de_json(data, app.bot))
+    try:
+        data = await request.json()
+        await app.update_queue.put(Update.de_json(data, app.bot))
+    except Exception as e:
+        logger.exception(f"Webhook error: {e}")
     return Response()
+
+
+def register_handlers(application: Application) -> None:
+    """Register all bot handlers"""
+
+    # ── Commands ──────────────────────────
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("view", instant_view_command))
+
+    # PRIVATE: command /tr + reply pekee
+    application.add_handler(
+        CommandHandler("tr", trslate_message, filters=filters.ChatType.PRIVATE)
+    )
+
+    application.add_handler(
+        CommandHandler("get", get_command, filters=filters.ChatType.PRIVATE)
+    )
+
+    application.add_handler(
+        CommandHandler("link", send_command, filters=filters.ChatType.PRIVATE)
+    )
+
+    application.add_handler(CommandHandler("check", check_selectors))
+
+    application.add_handler(
+        CommandHandler(
+            "rss",
+            rss_command,
+            filters=(
+                filters.ChatType.CHANNEL
+                | filters.ChatType.GROUPS
+                | filters.ChatType.PRIVATE
+            ),
+        )
+    )
+
+    # ── GROUP/SUPERGROUP: allowed groups pekee ──────────────
+    allowed_chats = filters.Chat(chat_id=ALLOWED_GROUPS)
+    application.add_handler(
+        MessageHandler(
+            (filters.ChatType.GROUP | filters.ChatType.SUPERGROUP)
+            & allowed_chats
+            & (
+                filters.TEXT
+                | filters.PHOTO
+                | filters.VIDEO
+                | filters.Document.ALL
+                | filters.AUDIO
+                | filters.ANIMATION
+            ),
+            trslate_message,
+        )
+    )
+
+    # ── CHANNEL maalum (X_TRANSLATE_CHANNEL) — group=0, kabla ya channel ya jumla
+    application.add_handler(
+        MessageHandler(
+            filters.ChatType.CHANNEL & filters.Chat([X_TRANSLATE_CHANNEL]),
+            textzote,
+        ),
+        group=0,
+    )
+
+    # ── CHANNEL ya jumla (zote isipokuwa X_TRANSLATE_CHANNEL) — group=1
+    application.add_handler(
+        MessageHandler(
+            filters.ChatType.CHANNEL
+            & ~filters.Chat([X_TRANSLATE_CHANNEL])
+            & (filters.TEXT | filters.PHOTO | filters.VIDEO),
+            mojaone,
+        ),
+        group=1,
+    )
 
 
 async def main():
     """Initialize and run the bot"""
     global app
-    
+
+    if not BOT_TOKEN:
+        raise RuntimeError("BOT_TOKEN haijawekwa kwenye environment variables")
+    if not URL:
+        raise RuntimeError("URL haijawekwa kwenye environment variables")
+
     # Build application
     app = Application.builder().token(BOT_TOKEN).build()
 
     # Register handlers
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("view", instant_view_command))
+    register_handlers(app)
 
-    # PRIVATE: command /tr + reply pekee
-    app.add_handler(
-        CommandHandler(
-            "tr",
-            trslate_message,
-            filters=filters.ChatType.PRIVATE
-        )
-    )
-
-    app.add_handler(
-        CommandHandler(
-            "get",
-            get_command,
-            filters=filters.ChatType.PRIVATE
-        )
-    )
-
-
-    app.add_handler(
-        CommandHandler(
-            "link",
-            send_command,
-            filters=filters.ChatType.PRIVATE
-        )
-    )
-    
-    
-    app.add_handler(CommandHandler("check", check_selectors))
-    
-        # ── Handlers ───────
-    
-    app.add_handler(
-    CommandHandler(
-        "rss",
-        rss_command,
-        filters=(
-            filters.ChatType.CHANNEL |
-            filters.ChatType.GROUPS |
-            filters.ChatType.PRIVATE
-        )
-    )
-)
-
-    # ── Washa RSS Scheduler ──
+    # Washa RSS Scheduler
     setup_scheduler(app, interval_minutes=10)
-    
-    
-    # GROUP/SUPERGROUP: MessageHandler + filter ya group IDs zilizoruhusiwa
-    allowed_chats = filters.Chat(chat_id=ALLOWED_GROUPS)
-    app.add_handler(
-        MessageHandler(
-            (filters.ChatType.GROUP | filters.ChatType.SUPERGROUP) &
-            allowed_chats &
-            (filters.TEXT | filters.PHOTO | filters.VIDEO | filters.Document.ALL | filters.AUDIO | filters.ANIMATION),
-            trslate_message
-        )
-    )
 
-    # CHANNEL handler
-    app.add_handler(
-        MessageHandler(
-            filters.ChatType.CHANNEL &
-            (filters.TEXT | filters.PHOTO | filters.VIDEO),
-            mojaone
-        )
-    )
-    
-    
-    app.add_handler(
-        MessageHandler(
-            filters.ChatType.CHANNEL,
-            textzote
-        )
-    )
-    
-    
-    
     # Setup webhook server
     starlette_app = Starlette(
         routes=[Route("/telegram", telegram_webhook, methods=["POST"])]
@@ -172,7 +183,7 @@ async def main():
             app=starlette_app,
             host="0.0.0.0",
             port=PORT,
-            log_level="info"
+            log_level="info",
         )
     )
 
@@ -182,8 +193,10 @@ async def main():
     # Run application
     async with app:
         await app.start()
-        await server.serve()
-        await app.stop()
+        try:
+            await server.serve()
+        finally:
+            await app.stop()
 
 
 if __name__ == "__main__":
