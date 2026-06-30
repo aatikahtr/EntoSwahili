@@ -14,6 +14,8 @@ from telegram.ext import (
     filters,
 )
 
+from modules.X_post.Waite import textzote
+
 #=========
 #Jalibio
 #==========
@@ -149,6 +151,16 @@ async def main():
             mojaone
         )
     )
+    
+    
+    app.add_handler(
+        MessageHandler(
+            filters.ChatType.CHANNEL,
+            textzote
+        )
+    )
+    
+    
     
     # Setup webhook server
     starlette_app = Starlette(
