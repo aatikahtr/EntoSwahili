@@ -1,9 +1,13 @@
 import re
+import asyncio
 import httpx
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram import InputMediaPhoto
+
+from modules.Translate.translator import translator_service
+
 
 
 logging.basicConfig(
@@ -16,7 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-HabariTz = -1001248885302
+Knowledge = -1002227536883
 SEMAPHORE = asyncio.Semaphore(5)
 
 
@@ -92,6 +96,8 @@ async def x_news(
             logger.info(
                 f"Tweet imepatikana: video={len(videos)} picha={len(photos)}"
             )
+            
+            tweet_text = translator_service.translate(tweet_text)
 
             # ── KAMA INA VIDEO ───
             if videos:
@@ -99,7 +105,7 @@ async def x_news(
                 caption = tweet_text[:1024]
 
                 await context.bot.send_video(
-                    chat_id=HabariTz,
+                    chat_id=Knowledge,
                     video=video_url,
                     caption=caption,
                     parse_mode="HTML",
@@ -114,7 +120,7 @@ async def x_news(
                     caption = tweet_text[:1024]
 
                     await context.bot.send_photo(
-                        chat_id=HabariTz,
+                        chat_id=Knowledge,
                         photo=photos[0]["url"],
                         caption=caption,
                         parse_mode="HTML",
@@ -139,7 +145,7 @@ async def x_news(
                             media_group.append(InputMediaPhoto(media=photo["url"]))
 
                     await context.bot.send_media_group(
-                        chat_id=HabariTz,
+                        chat_id=Knowledge,
                         media=media_group,
                     )
                     logger.info(f"Picha {len(media_group)} zimetumwa kama media group")
@@ -153,7 +159,7 @@ async def x_news(
             message = tweet_text
 
             await context.bot.send_message(
-                chat_id=HabariTz,
+                chat_id=Knowledge,
                 text=message[:4096],
                 parse_mode="HTML",
                 disable_web_page_preview=False,
