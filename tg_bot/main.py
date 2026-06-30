@@ -14,7 +14,7 @@ from telegram.ext import (
     filters,
 )
 
-from tg_bot.modules.X_post.Waite import textzote
+from modules.X_post.Waite import textzote
 
 #=========
 #Jalibio
