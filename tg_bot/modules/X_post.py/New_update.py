@@ -56,7 +56,7 @@ async def fetch_tweet_data(tweet_id: str) -> dict | None:
         return None
 
 
-async def x_news(
+async def x_update(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     new_url: str,
