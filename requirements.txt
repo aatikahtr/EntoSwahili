@@ -18,4 +18,4 @@ aiohttp
 lxml
 #python-telegram-bot[job-queue]
 motor
-
+easyocr
