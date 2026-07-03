@@ -8,6 +8,28 @@ URL_REGEX = re.compile(r'(https?://[^\s]+)')
 Knowledge_translate = -1004358606228
 ERROR_CHAT_ID = -1003754038608
 
+# -----------------------------------
+# BLOCK WORDS
+# -----------------------------------
+BLOCK_WORDS = {
+    "MillardAyoMagazetiTz&Kenya",
+    "#Magazetiyaleo",
+    "list@rss",
+    "Your subscriptions:",
+    "@rss2tg_bot",
+    "Removed:",
+    "⚠️",
+    "Added:",
+    "latest record:",
+}
+
+BLOCK_PREFIXES = (
+    "/",
+    "/settings@rss",
+)
+
+
+
 async def textzote(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         msg = update.channel_post or update.edited_channel_post
@@ -16,6 +38,9 @@ async def textzote(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         chat_id = msg.chat.id
         text = msg.text or ""
+        
+        if text.startswith(BLOCK_PREFIXES) or any(word in text for word in BLOCK_WORDS):
+            return
 
         if any(word in text for word in ["R to @", "RT by @", "RT @"]):
             await context.bot.delete_message(
