@@ -94,27 +94,7 @@ def register_handlers(application: Application) -> None:
         CommandHandler("tr", trslate_message, filters=filters.ChatType.PRIVATE)
     )
 
-    application.add_handler(
-        CommandHandler("get", get_command, filters=filters.ChatType.PRIVATE)
-    )
 
-    application.add_handler(
-        CommandHandler("link", send_command, filters=filters.ChatType.PRIVATE)
-    )
-
-    application.add_handler(CommandHandler("check", check_selectors))
-
-    application.add_handler(
-        CommandHandler(
-            "rss",
-            rss_command,
-            filters=(
-                filters.ChatType.CHANNEL
-                | filters.ChatType.GROUPS
-                | filters.ChatType.PRIVATE
-            ),
-        )
-    )
 
     # ── GROUP/SUPERGROUP: allowed groups pekee ──────────────
     allowed_chats = filters.Chat(chat_id=ALLOWED_GROUPS)
