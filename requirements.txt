@@ -7,7 +7,7 @@ uvicorn~=0.23.2
 #requests
 httpx
 beautifulsoup4
-#playwright
+playwright
 bs4
 telegraph
 aiohttp
@@ -17,5 +17,4 @@ aiohttp
 #rss
 lxml
 #python-telegram-bot[job-queue]
-#motor
-#easyocr
+motor
