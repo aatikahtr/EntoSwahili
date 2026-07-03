@@ -2,16 +2,17 @@ import re
 import asyncio
 import httpx
 import logging
-import easyocr
-from telegram import Update, InputMediaPhoto
+from telegram import Update
 from telegram.ext import ContextTypes
+from telegram import InputMediaPhoto
 
 from modules.Translate.translator import translator_service
 
-# ─── Logger setup ───
+
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler("bot.log", encoding="utf-8"),
         logging.StreamHandler()
@@ -22,8 +23,6 @@ logger = logging.getLogger(__name__)
 Knowledge = -1002227536883
 SEMAPHORE = asyncio.Semaphore(5)
 
-# ─── OCR Reader ───
-reader = easyocr.Reader(['en', 'sw'])  # unaweza kuongeza lugha nyingine
 
 def extract_tweet_id(url: str) -> str | None:
     """Toa Tweet ID kutoka URL yoyote ya X/Twitter/FxTwitter."""
@@ -57,19 +56,6 @@ async def fetch_tweet_data(tweet_id: str) -> dict | None:
         return None
 
 
-async def translate_photo_text(photo_url: str) -> str:
-    """Soma maandishi kutoka picha na kutafsiri kwa Kiswahili."""
-    try:
-        results = reader.readtext(photo_url)
-        text_in_photo = " ".join([res[1] for res in results])
-        if not text_in_photo.strip():
-            return "Hakuna maandishi yaliyopatikana kwenye picha."
-        return translator_service.translate(text_in_photo)
-    except Exception as e:
-        logger.error(f"OCR error: {e}")
-        return "Imeshindwa kusoma maandishi kwenye picha."
-
-
 async def x_update(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -82,78 +68,118 @@ async def x_update(
         async with SEMAPHORE:
             logger.info(f"Anachakata URL: {new_url}")
 
-            # Toa Tweet ID
+            # Toa Tweet ID kutoka URL
             tweet_id = extract_tweet_id(new_url)
             if not tweet_id:
-                await context.bot.send_message(chat_id=chat_id, text=f"⚠️ URL si sahihi: {new_url}")
+                logger.warning(f"Haiwezi kutoa Tweet ID kutoka: {new_url}")
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"⚠️ URL si sahihi: {new_url}"
+                )
                 return
 
-            # Pata data
+            # Pata data kutoka FxTwitter API
             tweet = await fetch_tweet_data(tweet_id)
             if not tweet:
-                await context.bot.send_message(chat_id=chat_id, text=f"⚠️ Imeshindwa kupata tweet: {new_url}")
+                logger.warning(f"Hakuna data kwa tweet ID: {tweet_id}")
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"⚠️ Imeshindwa kupata tweet: {new_url}"
+                )
                 return
 
-            # Taarifa muhimu
+            # Toa taarifa muhimu
             tweet_text = tweet.get("text", "")
             media = tweet.get("media", {}) or {}
             videos = media.get("videos", []) or []
             photos = media.get("photos", []) or []
-
-            # Tafsiri maandishi ya tweet
+            logger.info(
+                f"Tweet imepatikana: video={len(videos)} picha={len(photos)}"
+            )
+            
             tweet_text = translator_service.translate(tweet_text)
 
-            # ── VIDEO ──
+            # ── KAMA INA VIDEO ───
             if videos:
                 video_url = videos[0]["url"]
                 caption = tweet_text[:1024]
+
                 await context.bot.send_video(
                     chat_id=Knowledge,
                     video=video_url,
                     caption=caption,
                     parse_mode="HTML",
                 )
+                logger.info(f"Video imetumwa: {video_url[:60]}")
                 return
 
-            # ── PICHA ──
+            # ── KAMA INA PICHA MOJA AU NYINGI ────
             if photos:
                 if len(photos) == 1:
-                    translated_caption = await translate_photo_text(photos[0]["url"])
+                    # Picha moja — tuma kama photo na caption
+                    caption = tweet_text[:1024]
+
                     await context.bot.send_photo(
                         chat_id=Knowledge,
                         photo=photos[0]["url"],
-                        caption=translated_caption[:1024],
+                        caption=caption,
                         parse_mode="HTML",
                     )
+                    logger.info("Picha moja imetumwa")
+
                 else:
+                    # Picha nyingi — tuma kama media group
                     media_group = []
-                    for i, photo in enumerate(photos[:10]):
+                    for i, photo in enumerate(photos[:10]):  # Telegram max ni 10
                         if i == 0:
-                            translated_caption = await translate_photo_text(photo["url"])
+                            # Caption kwenye picha ya kwanza tu
+                            caption = tweet_text[:1024]
                             media_group.append(
                                 InputMediaPhoto(
                                     media=photo["url"],
-                                    caption=translated_caption[:1024],
+                                    caption=caption,
                                     parse_mode="HTML"
                                 )
                             )
                         else:
                             media_group.append(InputMediaPhoto(media=photo["url"]))
-                    await context.bot.send_media_group(chat_id=Knowledge, media=media_group)
+
+                    await context.bot.send_media_group(
+                        chat_id=Knowledge,
+                        media=media_group,
+                    )
+                    logger.info(f"Picha {len(media_group)} zimetumwa kama media group")
+
                 return
 
-            # ── TEXT TU ──
+            # ── TEXT TU (hakuna media) ──
+            title = tweet_text.split("\n\n")[0] if "\n\n" in tweet_text else tweet_text.split(", ")[0]
+            title = title.replace("\n", " ").strip()
+
+            message = tweet_text
+
             await context.bot.send_message(
                 chat_id=Knowledge,
-                text=tweet_text[:4096],
+                text=message[:4096],
                 parse_mode="HTML",
                 disable_web_page_preview=False,
             )
+            logger.info(f"Text imetumwa: {title[:50]}")
 
     except Exception as e:
         logger.exception(f"Hitilafu kubwa: {e}")
-        error_text = f"❌ HITILAFU URL_UPDATE\nChat ID: {chat_id}\nError: {str(e)[:200]}\nURL: {new_url}"
+
+        error_text = (
+            "❌ HITILAFU URL_UPDATE\n"
+            f"Chat ID: {chat_id}\n"
+            f"Error: {str(e)[:200]}\n"
+            f"URL: {new_url}"
+        )
+
         try:
-            await context.bot.send_message(error_chat_id, text=error_text[:1000])
+            await context.bot.send_message(
+                error_chat_id,
+                text=error_text[:1000]
+            )
         except:
             pass
