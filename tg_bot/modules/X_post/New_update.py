@@ -60,7 +60,7 @@ async def x_update(
     context: ContextTypes.DEFAULT_TYPE,
     new_url: str,
     chat_id: int,
-    message_id: int = None  # Nimeongeza hii
+    message_id: int = None
 ):
     error_chat_id = chat_id
 
@@ -100,7 +100,7 @@ async def x_update(
             
             tweet_text = translator_service.translate(tweet_text)
             
-            # Amua target chat - TUMIA elif BADALA YA if
+            # Amua target chat
             if chat_id == -1004358606228:
                 send_id = -1002227536883
                 logger.info(f"Kutuma kwa Knowledge group: {send_id}")
@@ -121,7 +121,7 @@ async def x_update(
                 else:
                     logger.warning(f"Hakuna message_id - haitaweza kufuta ujumbe")
             else:
-                send_id = chat_id  # Default - tuma kwenye chat iliyotuma
+                send_id = chat_id
                 logger.info(f"Chat {chat_id} haipo kwenye list, kutuma kwa chat hiyo hiyo")
             
             # ── KAMA INA VIDEO ───
@@ -205,18 +205,6 @@ async def x_update(
             await context.bot.send_message(
                 error_chat_id,
                 text=error_text[:1000]
-            )
-        except:
-            passURL_UPDATE\n"
-            f"Chat ID: {chat_id}\n"
-            f"Error: {str(e)[:200]}\n"
-            f"URL: {new_url}"
-        )
-
-        try:
-            await context.bot.send_message(
-                error_chat_id,
-                text=error_text[:MAX_MESSAGE_LENGTH]
             )
         except Exception as e:
             logger.error(f"Imeshindwa kutuma ujumbe wa hitilafu: {e}")
