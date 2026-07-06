@@ -59,15 +59,13 @@ async def x_update(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     new_url: str,
-    chat_id: int,
-    message_id: int = None
+    chat_id: int
 ):
     error_chat_id = chat_id
 
     try:
         async with SEMAPHORE:
             logger.info(f"Anachakata URL: {new_url}")
-            logger.info(f"Chat ID: {chat_id}, Message ID: {message_id}")
 
             # Toa Tweet ID kutoka URL
             tweet_id = extract_tweet_id(new_url)
@@ -100,30 +98,11 @@ async def x_update(
             
             tweet_text = translator_service.translate(tweet_text)
             
-            # Amua target chat
             if chat_id == -1004358606228:
                 send_id = -1002227536883
-                logger.info(f"Kutuma kwa Knowledge group: {send_id}")
-            elif chat_id == -1002029795026:
+
+            if chat_id == -1002029795026:
                 send_id = -1002029795026
-                logger.info(f"Kutuma kwa group B: {send_id}")
-                
-                # Futa ujumbe wa asili
-                if message_id:
-                    try:
-                        await context.bot.delete_message(
-                            chat_id=chat_id,
-                            message_id=message_id
-                        )
-                        logger.info(f"Ujumbe {message_id} umefutwa")
-                    except Exception as e:
-                        logger.error(f"Imeshindwa kufuta ujumbe: {e}")
-                else:
-                    logger.warning(f"Hakuna message_id - haitaweza kufuta ujumbe")
-            else:
-                send_id = chat_id
-                logger.info(f"Chat {chat_id} haipo kwenye list, kutuma kwa chat hiyo hiyo")
-            
             # ── KAMA INA VIDEO ───
             if videos:
                 video_url = videos[0]["url"]
@@ -206,5 +185,5 @@ async def x_update(
                 error_chat_id,
                 text=error_text[:1000]
             )
-        except Exception as e:
-            logger.error(f"Imeshindwa kutuma ujumbe wa hitilafu: {e}")
+        except:
+            pass
