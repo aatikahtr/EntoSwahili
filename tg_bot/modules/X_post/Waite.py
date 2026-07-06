@@ -56,8 +56,10 @@ async def textzote(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         new_url = urls[-1]
 
         if chat_id in Knowledge_translate:
-            print('imeitwA') 
             asyncio.create_task(x_update(update, context, new_url, chat_id))
+            if chat_id == -1002029795026:
+                    await context.bot.delete_message(chat_id=chat_id, message_id=message.message_id
+                    )
             return
 
     except Exception as e:
