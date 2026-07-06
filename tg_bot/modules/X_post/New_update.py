@@ -59,7 +59,8 @@ async def x_update(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     new_url: str,
-    chat_id: int
+    chat_id: int,
+    message_id: int = None  # Nimeongeza hii
 ):
     error_chat_id = chat_id
 
@@ -98,15 +99,23 @@ async def x_update(
             
             tweet_text = translator_service.translate(tweet_text)
             
+            # Amua target chat
             if chat_id == -1004358606228:
                 send_id = -1002227536883
-
-            if chat_id == -1002029795026:
+            elif chat_id == -1002029795026:
                 send_id = -1002029795026
-                await context.bot.delete_message(
-                    chat_id=chat_id,
-                    message_id=message.message_id
-                    )
+                # Futa ujumbe wa asili
+                if message_id:
+                    try:
+                        await context.bot.delete_message(
+                            chat_id=chat_id,
+                            message_id=message_id
+                        )
+                    except Exception as e:
+                        logger.error(f"Imeshindwa kufuta ujumbe: {e}")
+            else:
+                send_id = chat_id  # Tuma kwenye chat iliyotuma
+            
             # ── KAMA INA VIDEO ───
             if videos:
                 video_url = videos[0]["url"]
