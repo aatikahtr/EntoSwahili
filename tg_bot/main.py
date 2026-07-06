@@ -63,7 +63,7 @@ URL = os.getenv("URL")
 PORT = int(os.getenv("PORT", 10000))
 
 # Groups zinazoruhusiwa
-ALLOWED_GROUPS = [-1001668363178, -1001669440207]
+ALLOWED_GROUPS = [-1001668363178, -1002029795026]
 
 # Channel maalum kwa textzote (X/Twitter URLs) - SASA NI LIST
 X_TRANSLATE_CHANNELS = [-1004358606228, -1002029795026]
