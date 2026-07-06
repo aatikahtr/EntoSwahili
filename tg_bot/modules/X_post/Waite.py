@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes
 from .New_update import x_update
 
 URL_REGEX = re.compile(r'(https?://[^\s]+)')
-Knowledge_translate = -1004358606228
+Knowledge_translate = [-1004358606228, -1002029795026]
 ERROR_CHAT_ID = -1003754038608
 
 # -----------------------------------
@@ -55,7 +55,7 @@ async def textzote(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         new_url = urls[-1]
 
-        if chat_id == Knowledge_translate:
+        if chat_id in Knowledge_translate:
             asyncio.create_task(x_update(update, context, new_url, chat_id))
             return
 
