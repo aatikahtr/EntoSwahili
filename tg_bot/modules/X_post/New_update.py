@@ -20,7 +20,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-Knowledge = -1002227536883
 SEMAPHORE = asyncio.Semaphore(5)
 
 
@@ -98,14 +97,23 @@ async def x_update(
             )
             
             tweet_text = translator_service.translate(tweet_text)
+            
+            if chat_id == -1004358606228:
+                send_id = -1002227536883
 
+            if chat_id == -1002029795026:
+                send_id = -1002029795026
+                await context.bot.delete_message(
+                    chat_id=chat_id,
+                    message_id=message.message_id
+                    )
             # ── KAMA INA VIDEO ───
             if videos:
                 video_url = videos[0]["url"]
                 caption = tweet_text[:1024]
 
                 await context.bot.send_video(
-                    chat_id=Knowledge,
+                    chat_id=send_id,
                     video=video_url,
                     caption=caption,
                     parse_mode="HTML",
@@ -120,7 +128,7 @@ async def x_update(
                     caption = tweet_text[:1024]
 
                     await context.bot.send_photo(
-                        chat_id=Knowledge,
+                        chat_id=send_id,
                         photo=photos[0]["url"],
                         caption=caption,
                         parse_mode="HTML",
@@ -145,7 +153,7 @@ async def x_update(
                             media_group.append(InputMediaPhoto(media=photo["url"]))
 
                     await context.bot.send_media_group(
-                        chat_id=Knowledge,
+                        chat_id=send_id,
                         media=media_group,
                     )
                     logger.info(f"Picha {len(media_group)} zimetumwa kama media group")
@@ -159,7 +167,7 @@ async def x_update(
             message = tweet_text
 
             await context.bot.send_message(
-                chat_id=Knowledge,
+                chat_id=send_id,
                 text=message[:4096],
                 parse_mode="HTML",
                 disable_web_page_preview=False,
