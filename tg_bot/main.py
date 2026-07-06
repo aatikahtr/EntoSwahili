@@ -65,8 +65,8 @@ PORT = int(os.getenv("PORT", 10000))
 # Groups zinazoruhusiwa
 ALLOWED_GROUPS = [-1001668363178, -1001669440207]
 
-# Channel maalum kwa textzote (X/Twitter URLs)
-X_TRANSLATE_CHANNEL = -1004358606228
+# Channel maalum kwa textzote (X/Twitter URLs) - SASA NI LIST
+X_TRANSLATE_CHANNELS = [-1004358606228, -1002029795026]
 
 # Global application instance
 app: Application | None = None
@@ -94,8 +94,6 @@ def register_handlers(application: Application) -> None:
         CommandHandler("tr", trslate_message, filters=filters.ChatType.PRIVATE)
     )
 
-
-
     # ── GROUP/SUPERGROUP: allowed groups pekee ──────────────
     allowed_chats = filters.Chat(chat_id=ALLOWED_GROUPS)
     application.add_handler(
@@ -114,20 +112,21 @@ def register_handlers(application: Application) -> None:
         )
     )
 
-    # ── CHANNEL maalum (X_TRANSLATE_CHANNEL) — group=0, kabla ya channel ya jumla
+    # ── CHANNEL maalum (X_TRANSLATE_CHANNELS) — group=0, kabla ya channel ya jumla
+    # Tumia filters.Chat(chat_id=LIST) moja kwa moja, si [LIST]
     application.add_handler(
         MessageHandler(
-            filters.ChatType.CHANNEL & filters.Chat([X_TRANSLATE_CHANNEL]),
+            filters.ChatType.CHANNEL & filters.Chat(chat_id=X_TRANSLATE_CHANNELS),
             textzote,
         ),
         group=0,
     )
 
-    # ── CHANNEL ya jumla (zote isipokuwa X_TRANSLATE_CHANNEL) — group=1
+    # ── CHANNEL ya jumla (zote isipokuwa X_TRANSLATE_CHANNELS) — group=1
     application.add_handler(
         MessageHandler(
             filters.ChatType.CHANNEL
-            & ~filters.Chat([X_TRANSLATE_CHANNEL])
+            & ~filters.Chat(chat_id=X_TRANSLATE_CHANNELS)
             & (filters.TEXT | filters.PHOTO | filters.VIDEO),
             mojaone,
         ),
