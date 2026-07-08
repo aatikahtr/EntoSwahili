@@ -15,7 +15,7 @@ from telegram.ext import (
     filters,
 )
 
-from modules.msghandler import textzotu
+from modules.msghandler import texttu
 
 # =========
 # Jalibio
@@ -111,16 +111,7 @@ def register_handlers(application: Application) -> None:
             trslate_message,
         )
     )
-
-    # ── CHANNEL maalum (X_TRANSLATE_CHANNELS) — group=0, kabla ya channel ya jumla
-    # Tumia filters.Chat(chat_id=LIST) moja kwa moja, si [LIST]
-    application.add_handler(
-        MessageHandler(
-            filters.ChatType.CHANNEL & filters.Chat(chat_id=X_TRANSLATE_CHANNELS),
-            textzote,
-        ),
-        group=0,
-    )
+    
 
     # ── CHANNEL ya jumla (zote isipokuwa X_TRANSLATE_CHANNELS) — group=1
     application.add_handler(
@@ -149,8 +140,8 @@ async def main():
     # TEXT TU
     app.add_handler(
         MessageHandler(
-            filters.ChatType.CHANNEL & filters.TEXT,
-            textzotu
+            filters.ChatType.CHANNEL & filters.TEXT & filters.Chat(chat_id=X_TRANSLATE_CHANNELS),
+            texttu
         )
     )
 
