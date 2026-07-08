@@ -4,7 +4,7 @@ from telegram.ext import ContextTypes
 
 from ID import error_chat_id
 from utils import BLOCK_WORDS, BLOCK_PREFIXES
-from tg_bot.Twitte.Xupdate import x_update
+from tg_bot.Twitter.Xupdate import x_update
 
 
 async def textzotu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
