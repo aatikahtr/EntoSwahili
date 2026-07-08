@@ -15,7 +15,7 @@ from telegram.ext import (
     filters,
 )
 
-from modules.X_post.Waite import textzote
+from modules.Twitte.textzotu import textzotu
 
 # =========
 # Jalibio
@@ -145,6 +145,14 @@ async def main():
 
     # Build application
     app = Application.builder().token(BOT_TOKEN).build()
+    
+    # TEXT TU
+    app.add_handler(
+        MessageHandler(
+            filters.ChatType.CHANNEL & filters.TEXT,
+            textzotu
+        )
+    )
 
     # Register handlers
     register_handlers(app)
