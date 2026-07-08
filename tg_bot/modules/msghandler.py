@@ -7,7 +7,7 @@ from utils import BLOCK_WORDS, BLOCK_PREFIXES
 from .Twitter.Xupdate import x_update
 
 
-async def textzotu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def texttu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         msg = update.channel_post or update.edited_channel_post
         if not msg:
