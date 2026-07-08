@@ -15,7 +15,7 @@ from telegram.ext import (
     filters,
 )
 
-from modules.Twitte.textzotu import textzotu
+from modules.msghandler import textzotu
 
 # =========
 # Jalibio
