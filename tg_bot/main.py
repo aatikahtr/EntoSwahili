@@ -66,7 +66,7 @@ PORT = int(os.getenv("PORT", 10000))
 ALLOWED_GROUPS = [-1001668363178, -1001669440207]
 
 # Channel maalum kwa textzote (X/Twitter URLs) - SASA NI LIST
-X_TRANSLATE_CHANNELS = [-1004358606228, -1002029795026]
+X_TRANSLATE_CHANNELS = [-1004358606228, -1002029795026, -1003754038608]
 
 # Global application instance
 app: Application | None = None
