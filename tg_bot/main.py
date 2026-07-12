@@ -140,7 +140,7 @@ async def main():
     # TEXT TU
     app.add_handler(
         MessageHandler(
-            filters.ChatType.CHANNEL & filters.TEXT & filters.Chat(chat_id=X_TRANSLATE_CHANNELS),
+            filters.TEXT & filters.Chat(chat_id=X_TRANSLATE_CHANNELS),
             texttu
         )
     )
