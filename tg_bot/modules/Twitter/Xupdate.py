@@ -53,7 +53,7 @@ async def fetch_tweet_data(tweet_id: str) -> dict | None:
 
 
 async def x_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.channel_post or update.edited_channel_post
+    msg = update.channel_post or update.message
     if not msg:
         return
 
