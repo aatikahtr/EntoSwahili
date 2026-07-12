@@ -9,7 +9,7 @@ from .Twitter.Xupdate import x_update
 
 async def texttu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
-        msg = update.channel_post or update.edited_channel_post
+        msg = update.channel_post or update.message
         if not msg:
             return
 
