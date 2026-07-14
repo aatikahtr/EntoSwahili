@@ -68,6 +68,8 @@ async def x_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         new_url = urls[-1]
+        if not "nitter" in new_url:
+            return 
 
         # Toa Tweet ID kutoka URL
         tweet_id = extract_tweet_id(new_url)
