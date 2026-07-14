@@ -7,6 +7,7 @@ from telegram import InputMediaPhoto
 
 from modules.Translate.translator import translator_service
 from utils import URL_REGEX
+from ID import error_chat_id
 
 
 logging.basicConfig(
@@ -59,7 +60,6 @@ async def x_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = msg.chat.id
     text = msg.text or ""
-    error_chat_id = chat_id
     new_url = None
 
     try:
