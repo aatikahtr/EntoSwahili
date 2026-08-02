@@ -110,6 +110,33 @@ async def x_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Hakuna send_id iliyowekwa kwa chat_id: {chat_id}")
             return
 
+        # ── KAMA TEXT INA URL YA rfi.my, TUMA KAMA TEXT TU ──
+        if "https://rfi.my" in tweet_text:
+            # Kama kuna link zaidi ya moja, kata kwenye mwanzo wa link ya mwisho
+            # (mfano: link ya nitter/source inayofuata baada ya link ya rfi.my)
+            first_idx = tweet_text.find("https://")
+            last_idx = tweet_text.rfind("https://")
+            if last_idx != first_idx:
+                tweet_text = tweet_text[:last_idx].rstrip()
+
+            await context.bot.send_message(
+                chat_id=send_id,
+                text=tweet_text[:4096],
+                parse_mode="HTML",
+                disable_web_page_preview=False,
+            )
+            logger.info("Tweet lenye rfi.my limetumwa kama text")
+
+            if chat_id == -1002029795026:
+                try:
+                    await context.bot.delete_message(
+                        chat_id=chat_id,
+                        message_id=msg.message_id
+                    )
+                except Exception as e:
+                    logger.error(f"Imeshindwa kufuta ujumbe wa awali: {e}")
+            return
+
         # ── KAMA INA VIDEO ───
         if videos:
             video_url = videos[0]["url"]
