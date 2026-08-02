@@ -119,16 +119,13 @@ async def x_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if last_idx != first_idx:
                 tweet_text = tweet_text[:last_idx].rstrip()
 
-            chat_zote = [send_id, -1001248885302]
-            for aid in chat_zote:
-                await context.bot.send_message(
-                    chat_id=aid,
-                    text=tweet_text[:4096],
-                    parse_mode="HTML",
-                    disable_web_page_preview=False,
-                )
-                logger.info("Tweet lenye rfi.my limetumwa kama text")
-                return 
+            await context.bot.send_message(
+                chat_id=send_id,
+                text=tweet_text[:4096],
+                parse_mode="HTML",
+                disable_web_page_preview=False,
+            )
+            logger.info("Tweet lenye rfi.my limetumwa kama text")
 
             if chat_id == -1002029795026:
                 try:
