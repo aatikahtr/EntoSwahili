@@ -1,4 +1,6 @@
 import re
+import time
+import threading
 from deep_translator import GoogleTranslator
 
 
@@ -20,6 +22,30 @@ class TranslatorService:
             target=TRANSLATION_TARGET
         )
     
+    # ── Kupunguza kasi + kujaribu tena (Google: ~5 maombi/sekunde) ──
+    _lock = threading.Lock()
+    _last_call = 0.0
+    MIN_INTERVAL = 0.5   # sekunde kati ya maombi
+    MAX_RETRIES = 5
+
+    def _call(self, text: str) -> str:
+        delay = 2.0
+        for attempt in range(self.MAX_RETRIES):
+            with self._lock:
+                wait = self.MIN_INTERVAL - (time.monotonic() - self._last_call)
+                if wait > 0:
+                    time.sleep(wait)
+                self._last_call = time.monotonic()
+            try:
+                return self.translator.translate(text)
+            except Exception as e:
+                too_many = "too many requests" in str(e).lower() or "429" in str(e)
+                if not too_many or attempt == self.MAX_RETRIES - 1:
+                    raise
+                time.sleep(delay)   # subiri kisha jaribu tena
+                delay *= 2
+        return text
+
     def translate(self, text: str) -> str:
         """
         Tafsiri maandishi na fanya marekebisho maalum baada ya tafsiri
@@ -30,7 +56,7 @@ class TranslatorService:
         
         text = Kata.split(text, 1)[0]
         # Tafsiri maandishi kwa kutumia Google Translator
-        translated = self.translator.translate(text)
+        translated = self._call(text)
 
         # Marekebisho maalum ya maneno baada ya tafsiri
         # Badilisha "Mwenyezi Mungu" kuwa "Allah"
@@ -61,15 +87,45 @@ class TranslatorService:
 
         return "\n".join(self.translate(x) for x in parts)
 
-    def translate_batch(self, texts: list[str]) -> list[str]:
-        """Tafsiri orodha ya vipande (kwa PDF). Kipande kikishindwa, kinabaki asili."""
-        out = []
-        for t in texts:
+    def translate_batch(self, texts: list[str], limit: int = 4000) -> list[str]:
+        """
+        Tafsiri vipande vingi kwa maombi machache: kila kipande kinakuwa mstari
+        mmoja, vinaunganishwa hadi ~4000 herufi kwa ombi. Idadi ya mistari
+        ikibadilika, tunarudi kutafsiri kimoja kimoja.
+        """
+        flat = [" ".join(x.split()) for x in texts]
+        result = list(texts)
+
+        # panga vipande kwenye makundi
+        groups, cur, size = [], [], 0
+        for i, s in enumerate(flat):
+            if not s:
+                continue
+            if cur and size + len(s) + 1 > limit:
+                groups.append(cur)
+                cur, size = [], 0
+            cur.append(i)
+            size += len(s) + 1
+        if cur:
+            groups.append(cur)
+
+        for idxs in groups:
+            joined = "\n".join(flat[i] for i in idxs)
             try:
-                out.append(self.translate(t) if t.strip() else t)
+                out = self._call(joined).split("\n")
+                if len(out) == len(idxs):
+                    for i, o in zip(idxs, out):
+                        result[i] = o.replace("Mwenyezi Mungu", "Allah")
+                    continue
             except Exception:
-                out.append(t)
-        return out
+                pass
+            # fallback: kimoja kimoja
+            for i in idxs:
+                try:
+                    result[i] = self.translate(flat[i])
+                except Exception:
+                    result[i] = texts[i]
+        return result
 
     def should_translate(self, original: str, translated: str) -> bool:
         """
