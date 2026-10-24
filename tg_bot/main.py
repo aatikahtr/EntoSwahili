@@ -89,9 +89,31 @@ def register_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("view", instant_view_command))
 
-    # PRIVATE: command /tr + reply pekee
+    # /tr — private na kwenye groups zilizoruhusiwa (reply, maandishi, au PDF)
     application.add_handler(
-        CommandHandler("tr", trslate_message, filters=filters.ChatType.PRIVATE)
+        CommandHandler(
+            "tr",
+            trslate_message,
+            filters=filters.ChatType.PRIVATE | filters.Chat(chat_id=ALLOWED_GROUPS),
+        )
+    )
+
+    # PRIVATE: PDF ikitumwa moja kwa moja → tafsiri (au caption "/tr")
+    application.add_handler(
+        MessageHandler(
+            filters.ChatType.PRIVATE & filters.Document.PDF,
+            trslate_message,
+        )
+    )
+
+    # Groups: PDF yenye caption "/tr"
+    application.add_handler(
+        MessageHandler(
+            filters.Chat(chat_id=ALLOWED_GROUPS)
+            & filters.Document.PDF
+            & filters.CaptionRegex(r"^/tr(@\w+)?(\s|$)"),
+            trslate_message,
+        )
     )
 
     # ── GROUP/SUPERGROUP: allowed groups pekee ──────────────
