@@ -1,6 +1,8 @@
+import os
 import re
 import time
 import threading
+import httpx
 from deep_translator import GoogleTranslator
 
 
@@ -28,6 +30,49 @@ class TranslatorService:
     MIN_INTERVAL = 0.5   # sekunde kati ya maombi
     MAX_RETRIES = 5
 
+    # ── Njia (backends) za kutafsiri, kwa mpangilio wa kujaribu ──
+    def _via_cloud_api(self, text: str) -> str:
+        """Google Cloud Translation API rasmi (inahitaji GOOGLE_API_KEY)"""
+        r = httpx.post(
+            "https://translation.googleapis.com/language/translate/v2",
+            params={"key": os.environ["GOOGLE_API_KEY"]},
+            data={"q": text, "target": TRANSLATION_TARGET, "format": "text"},
+            timeout=20,
+        )
+        r.raise_for_status()
+        return r.json()["data"]["translations"][0]["translatedText"]
+
+    def _via_gtx(self, text: str) -> str:
+        """Mlango wa gtx wa Google (mara nyingi hauzuiliwi haraka kama web scraper)"""
+        r = httpx.post(
+            "https://translate.googleapis.com/translate_a/single",
+            params={"client": "gtx", "sl": "auto", "tl": TRANSLATION_TARGET, "dt": "t"},
+            data={"q": text},
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=20,
+        )
+        r.raise_for_status()
+        return "".join(part[0] for part in r.json()[0] if part and part[0])
+
+    def _via_deep_translator(self, text: str) -> str:
+        return self.translator.translate(text)
+
+    def _once(self, text: str) -> str:
+        backends = []
+        if os.getenv("GOOGLE_API_KEY"):
+            backends.append(self._via_cloud_api)
+        backends += [self._via_gtx, self._via_deep_translator]
+
+        last = None
+        for fn in backends:
+            try:
+                out = fn(text)
+                if out:
+                    return out
+            except Exception as e:
+                last = e
+        raise last or RuntimeError("Hakuna njia ya kutafsiri iliyofanya kazi")
+
     def _call(self, text: str) -> str:
         delay = 2.0
         for attempt in range(self.MAX_RETRIES):
@@ -37,7 +82,7 @@ class TranslatorService:
                     time.sleep(wait)
                 self._last_call = time.monotonic()
             try:
-                return self.translator.translate(text)
+                return self._once(text)
             except Exception as e:
                 too_many = "too many requests" in str(e).lower() or "429" in str(e)
                 if not too_many or attempt == self.MAX_RETRIES - 1:
