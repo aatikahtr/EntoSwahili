@@ -14,7 +14,7 @@ from pymongo.errors import DuplicateKeyError
 
 log = logging.getLogger(__name__)
 
-MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URI = os.getenv("mongodb+srv://Rss_bot:b3Alpko0J1Nz5Fz9@cluster0.rjq2zht.mongodb.net/?appName=Cluster0")
 if not MONGO_URI:
     raise RuntimeError("MONGO_URI haijawekwa kwenye environment variables")
 
