@@ -12,5 +12,4 @@ bs4
 telegraph
 aiohttp
 
-#python-telegram-bot[job-queue]
 
