@@ -3,9 +3,10 @@ deep_translator
 starlette~=0.20.0
 uvicorn~=0.23.2
 feedparser
+motor
+dnspython
 httpx
 beautifulsoup4
 playwright
 telegraph
 aiohttp
-
