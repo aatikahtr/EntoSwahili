@@ -16,9 +16,8 @@ from telegram.ext import (
 )
 
 from modules.msghandler import texttu
-from telegram.ext import CommandHandler
 from modules.Rss.rss_cmd import rs
-from modules.Rss.rss_udt import start_rss_job
+from modules.Rss.rss_updt import start_rss_job
 
 
 
@@ -84,6 +83,20 @@ def register_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("view", instant_view_command))
 
+    # /rs — RSS (private, groups, na channels)
+    application.add_handler(
+        CommandHandler(
+            "rs",
+            rs,
+            filters=filters.UpdateType.MESSAGE | filters.UpdateType.CHANNEL_POST,
+        )
+    )
+
+    # TEXT tu kwa X channels
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Chat(chat_id=X_TRANSLATE_CHANNELS), texttu)
+    )
+
     # /tr — private na kwenye groups zilizoruhusiwa (reply, maandishi, au PDF)
     application.add_handler(
         CommandHandler(
@@ -138,21 +151,11 @@ async def main():
     # Build application
     app = Application.builder().token(BOT_TOKEN).build()
     
-    # TEXT TU
-    app.add_handler(CommandHandler("rs", rs))   # kwa channel ongeza: filters=filters.UpdateType.MESSAGES | filters.UpdateType.CHANNEL_POSTS
-start_rss_job(app)
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & filters.Chat(chat_id=X_TRANSLATE_CHANNELS),
-            texttu
-        )
-    )
-
     # Register handlers
     register_handlers(app)
 
-    # Washa RSS Scheduler
-    setup_scheduler(app, interval_minutes=10)
+    # Washa RSS job (inakagua kila INTERVAL)
+    start_rss_job(app)
 
     # Setup webhook server
     starlette_app = Starlette(
