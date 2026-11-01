@@ -1,73 +1,68 @@
-"""Rss/rss_cmd.py - Commands zote za RSS: /rs list | add url | stop url"""
+"""Rss/rss_updt.py - Hukagua RSS feeds kila baada ya muda na kutuma updates mpya."""
 import asyncio
+import json
+import os
 
 import feedparser
-from telegram import Update
 from telegram.ext import ContextTypes
 
-from .rss_updt import FEEDS_FILE, SEEN_FILE, entry_id, load_json, save_json
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FEEDS_FILE = os.path.join(BASE_DIR, "rss_feeds.json")  # {chat_id: [urls]}
+SEEN_FILE = os.path.join(BASE_DIR, "rss_seen.json")    # {"chat_id|url": [ids]}
+INTERVAL = 300  # sekunde (dakika 5)
 
-USAGE = "Tumia:\n/rs list\n/rs add url\n/rs stop url"
+
+def load_json(path: str) -> dict:
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
 
 
-async def rs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    msg = update.channel_post or update.message
-    if not msg:
-        return
+def save_json(path: str, data: dict) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
 
-    chat_id = str(msg.chat.id)
-    args = context.args or []
+
+def entry_id(entry) -> str:
+    return entry.get("id") or entry.get("link") or ""
+
+
+async def rss_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Job inayokagua feeds zote za kila chat na kutuma mpya."""
     feeds = load_json(FEEDS_FILE)
-    urls = feeds.get(chat_id, [])
+    seen = load_json(SEEN_FILE)
 
-    async def reply(text: str):
-        await msg.reply_text(
-            text,
-            message_thread_id=msg.message_thread_id,
-            disable_web_page_preview=True,
-        )
+    for chat_id, urls in feeds.items():
+        for url in urls:
+            key = f"{chat_id}|{url}"
+            try:
+                feed = await asyncio.to_thread(feedparser.parse, url)
+            except Exception:
+                continue
+            if not feed.entries:
+                continue
 
-    # /rs au /rs list
-    if not args or args[0].lower() == "list":
-        if not urls:
-            return await reply("Hakuna RSS iliyoongezwa.\n/rs add url")
-        lines = "\n".join(f"{i}. {u}" for i, u in enumerate(urls, 1))
-        return await reply(f"📡 RSS zako:\n{lines}")
+            old = set(seen.get(key, []))
+            new = [e for e in feed.entries if entry_id(e) and entry_id(e) not in old]
 
-    if len(args) < 2:
-        return await reply(USAGE)
+            for e in reversed(new):  # ya zamani kwanza
+                text = (
+                    f"📰 {feed.feed.get('title', 'RSS')}\n"
+                    f"{e.get('title', '')}\n{e.get('link', '')}"
+                )
+                try:
+                    await context.bot.send_message(chat_id=int(chat_id), text=text)
+                    await asyncio.sleep(1)  # epuka flood limit
+                except Exception:
+                    pass
 
-    action, url = args[0].lower(), args[1]
+            ids = {entry_id(e) for e in feed.entries if entry_id(e)}
+            seen[key] = list(old | ids)[-500:]
 
-    # /rs add url
-    if action == "add":
-        if url in urls:
-            return await reply("⚠️ Tayari ipo.")
-        feed = await asyncio.to_thread(feedparser.parse, url)
-        if not feed.entries:
-            return await reply("❌ Link hii si RSS sahihi au haina entries.")
+    save_json(SEEN_FILE, seen)
 
-        urls.append(url)
-        feeds[chat_id] = urls
-        save_json(FEEDS_FILE, feeds)
 
-        # hifadhi zilizopo ili zisitumwe upya
-        seen = load_json(SEEN_FILE)
-        seen[f"{chat_id}|{url}"] = [entry_id(e) for e in feed.entries if entry_id(e)]
-        save_json(SEEN_FILE, seen)
-        return await reply(f"✅ Imeongezwa: {feed.feed.get('title', url)}")
-
-    # /rs stop url
-    if action == "stop":
-        if url not in urls:
-            return await reply("❌ Haipo kwenye orodha.")
-        urls.remove(url)
-        feeds[chat_id] = urls
-        save_json(FEEDS_FILE, feeds)
-
-        seen = load_json(SEEN_FILE)
-        seen.pop(f"{chat_id}|{url}", None)
-        save_json(SEEN_FILE, seen)
-        return await reply("🛑 Imesimamishwa.")
-
-    await reply(USAGE)
+def start_rss_job(app) -> None:
+    """Iite mara moja kwenye main baada ya kutengeneza app."""
+    app.job_queue.run_repeating(rss_job, interval=INTERVAL, first=10)
