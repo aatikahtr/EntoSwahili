@@ -1,9 +1,7 @@
 """Rss/rss_updt.py - Hukagua RSS feeds kila baada ya muda na kutuma updates mpya."""
 import asyncio
 import ipaddress
-import json
 import logging
-import os
 import socket
 from urllib.parse import urlparse
 
@@ -12,37 +10,14 @@ import httpx
 from telegram.error import BadRequest, Forbidden, RetryAfter
 from telegram.ext import ContextTypes
 
-log = logging.getLogger(__name__)
+from . import rss_db as db
 
-# Weka RSS_DATA_DIR kwenye persistent volume ili data isipotee kwenye redeploy
-BASE_DIR = os.getenv("RSS_DATA_DIR") or os.path.dirname(os.path.abspath(__file__))
-os.makedirs(BASE_DIR, exist_ok=True)
-FEEDS_FILE = os.path.join(BASE_DIR, "rss_feeds.json")  # {chat_id: [urls]}
-SEEN_FILE = os.path.join(BASE_DIR, "rss_seen.json")    # {"chat_id|url": [ids]}
+log = logging.getLogger(__name__)
 
 INTERVAL = 300          # sekunde (dakika 5)
 MAX_PER_CYCLE = 10      # entries za juu kwa kila feed kwa mzunguko mmoja
 MAX_SEEN = 1000
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; RSSBot/1.0)"}
-
-# Lock moja inalinda kusoma/kuandika files (cmd na job hazigongani)
-LOCK = asyncio.Lock()
-
-
-# ---------- Storage ----------
-def load_json(path: str) -> dict:
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def save_json(path: str, data: dict) -> None:
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
-    os.replace(tmp, path)  # atomic: file haliharibiki ikizimwa katikati
 
 
 def entry_id(entry) -> str:
@@ -99,17 +74,22 @@ async def _send(bot, chat_id: int, text: str) -> str:
     return "retry"
 
 
-async def _process(bot, chat_id: str, url: str) -> None:
-    key = f"{chat_id}|{url}"
+async def _process(bot, chat_id: int, url: str) -> None:
     feed = await fetch_feed(url)
     if not feed or not feed.entries:
         return
 
-    async with LOCK:
-        old = list(load_json(SEEN_FILE).get(key, []))
+    current = [entry_id(e) for e in feed.entries if entry_id(e)]
+
+    exists, old = await db.get_ids(chat_id, url)
+    if not exists:  # imefutwa wakati job inaendesha
+        return
+    if old is None:  # hakuna rekodi: hifadhi kimya, usitume za zamani
+        await db.set_ids(chat_id, url, current[:MAX_SEEN])
+        log.info("Baseline imehifadhiwa: %s|%s", chat_id, url)
+        return
     old_set = set(old)
 
-    current = [entry_id(e) for e in feed.entries if entry_id(e)]
     new = [e for e in feed.entries if entry_id(e) and entry_id(e) not in old_set]
     new = list(reversed(new))[-MAX_PER_CYCLE:]  # ya zamani kwanza, mpya 10 tu
 
@@ -117,32 +97,28 @@ async def _process(bot, chat_id: str, url: str) -> None:
     unsent = set()
     for i, e in enumerate(new):
         text = f"📰 {title}\n{e.get('title', '')}\n{e.get('link', '')}"
-        if await _send(bot, int(chat_id), text) == "retry":
+        if await _send(bot, chat_id, text) == "retry":
             unsent = {entry_id(x) for x in new[i:]}  # zitajaribiwa tena
             break
         await asyncio.sleep(1)  # epuka flood limit
 
     kept = [i for i in current if i not in unsent]
-    merged = kept + [i for i in old if i not in set(kept)]
-
-    async with LOCK:
-        feeds = load_json(FEEDS_FILE)
-        if url not in feeds.get(chat_id, []):  # imefutwa wakati job inaendesha
-            return
-        seen = load_json(SEEN_FILE)
-        seen[key] = merged[:MAX_SEEN]
-        save_json(SEEN_FILE, seen)
+    kept_set = set(kept)
+    merged = kept + [i for i in old if i not in kept_set]
+    await db.set_ids(chat_id, url, merged[:MAX_SEEN])
 
 
 async def rss_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    async with LOCK:
-        feeds = load_json(FEEDS_FILE)
-    for chat_id, urls in feeds.items():
-        for url in list(urls):
-            try:
-                await _process(context.bot, chat_id, url)
-            except Exception:
-                log.exception("rss_job kosa: %s", url)
+    try:
+        feeds = await db.all_feeds()
+    except Exception:
+        log.exception("MongoDB: kusoma feeds kumeshindwa")
+        return
+    for d in feeds:
+        try:
+            await _process(context.bot, d["chat_id"], d["url"])
+        except Exception:
+            log.exception("rss_job kosa: %s", d.get("url"))
 
 
 def start_rss_job(app) -> None:
