@@ -12,12 +12,5 @@ bs4
 telegraph
 aiohttp
 
-#Rss
-
-#rss
-lxml
 #python-telegram-bot[job-queue]
-motor
 
-# PDF translate
-pymupdf
