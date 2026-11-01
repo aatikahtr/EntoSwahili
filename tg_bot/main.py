@@ -16,6 +16,11 @@ from telegram.ext import (
 )
 
 from modules.msghandler import texttu
+from telegram.ext import CommandHandler
+from modules.Rss.rss_cmd import rs
+from modules.Rss.rss_udt import start_rss_job
+
+
 
 # =========
 # Jalibio
@@ -134,6 +139,8 @@ async def main():
     app = Application.builder().token(BOT_TOKEN).build()
     
     # TEXT TU
+    app.add_handler(CommandHandler("rs", rs))   # kwa channel ongeza: filters=filters.UpdateType.MESSAGES | filters.UpdateType.CHANNEL_POSTS
+start_rss_job(app)
     app.add_handler(
         MessageHandler(
             filters.TEXT & filters.Chat(chat_id=X_TRANSLATE_CHANNELS),
