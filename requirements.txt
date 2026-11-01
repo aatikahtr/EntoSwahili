@@ -1,15 +1,10 @@
-python-telegram-bot==20.7
-python-telegram-bot[job-queue]
+python-telegram-bot[job-queue]==20.7
 deep_translator
 starlette~=0.20.0
 uvicorn~=0.23.2
-#Instant view
-#requests
+feedparser
 httpx
 beautifulsoup4
 playwright
-bs4
 telegraph
 aiohttp
-
-
