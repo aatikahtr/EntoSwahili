@@ -39,16 +39,6 @@ from modules.Instant_view.instant_command import instant_view_command
 # =========
 from modules.Mojamoja.moja1 import mojaone
 
-# =========
-# Check Url
-# =========
-from modules.selectors import check_selectors
-
-# ============
-# Website to rss
-# ============
-from modules.Rss.rss_command import rss_command
-from modules.Rss.rss_scheduler import setup_scheduler
 
 
 logging.basicConfig(
@@ -98,23 +88,7 @@ def register_handlers(application: Application) -> None:
         )
     )
 
-    # PRIVATE: PDF ikitumwa moja kwa moja → tafsiri (au caption "/tr")
-    application.add_handler(
-        MessageHandler(
-            filters.ChatType.PRIVATE & filters.Document.PDF,
-            trslate_message,
-        )
-    )
 
-    # Groups: PDF yenye caption "/tr"
-    application.add_handler(
-        MessageHandler(
-            filters.Chat(chat_id=ALLOWED_GROUPS)
-            & filters.Document.PDF
-            & filters.CaptionRegex(r"^/tr(@\w+)?(\s|$)"),
-            trslate_message,
-        )
-    )
 
     # ── GROUP/SUPERGROUP: allowed groups pekee ──────────────
     allowed_chats = filters.Chat(chat_id=ALLOWED_GROUPS)
