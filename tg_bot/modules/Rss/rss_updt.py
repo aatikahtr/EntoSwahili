@@ -113,6 +113,11 @@ async def _send(bot, chat_id: int, text: str) -> str:
     return "retry"
 
 
+def format_entry(e, latest: bool = False) -> str:
+    text = f"{e.get('title', '')}\n{e.get('link', '')}"
+    return f"🆕 Latest post\n{text}" if latest else text
+
+
 async def _process(bot, chat_id: int, url: str, feed) -> None:
     link_counts = Counter(e.get("link") for e in feed.entries if e.get("link"))
     dup_links = {l for l, n in link_counts.items() if n > 1}
@@ -122,9 +127,10 @@ async def _process(bot, chat_id: int, url: str, feed) -> None:
     exists, old = await db.get_ids(chat_id, url)
     if not exists:  # imefutwa wakati job inaendesha
         return
-    if old is None:  # hakuna rekodi: hifadhi kimya, usitume za zamani
+    if old is None:  # hakuna rekodi: hifadhi baseline, tuma post ya hivi karibuni tu
         await db.set_ids(chat_id, url, current[:MAX_SEEN])
         log.info("Baseline imehifadhiwa: %s|%s", chat_id, url)
+        await _send(bot, chat_id, format_entry(feed.entries[0], latest=True))
         return
     old_set = set(old)
 
@@ -134,11 +140,9 @@ async def _process(bot, chat_id: int, url: str, feed) -> None:
     ]
     new = list(reversed(new))[-MAX_PER_CYCLE:]  # ya zamani kwanza, mpya 10 tu
 
-    title = feed.feed.get("title", "RSS")
     unsent = set()
     for i, e in enumerate(new):
-        text = f"📰 {title}\n{e.get('title', '')}\n{e.get('link', '')}"
-        res = await _send(bot, chat_id, text)
+        res = await _send(bot, chat_id, format_entry(e))
         if res == "retry":
             unsent = {k for x in new[i:] for k in keys[id(x)]}  # zitajaribiwa tena
             break
