@@ -26,6 +26,11 @@ MAX_TEXT = 4000         # Telegram: 4096
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; RSSBot/1.0)"}
 
 
+def entry_id(entry) -> str:
+    """Imebaki kwa ajili ya rss_cmd.py (utangamano na msimbo wa zamani)."""
+    return entry.get("id") or entry.get("link") or ""
+
+
 def entry_keys(entry, dup_links: set) -> list:
     """Vitambulisho vyote vya entry: id, link (kama ni ya kipekee kwenye feed),
     au hash ya title+published kama fallback. Rekodi za zamani (id tu) zinaendelea kufanya kazi."""
@@ -60,7 +65,7 @@ async def is_safe_url(url: str) -> bool:
     return True
 
 
-async def fetch_feed(client: httpx.AsyncClient, url: str):
+async def _fetch(client: httpx.AsyncClient, url: str):
     """Pakua kwa usalama (redirects zinakaguliwa, ukubwa umewekewa kikomo) kisha parse."""
     try:
         for _ in range(MAX_REDIRECTS + 1):
@@ -87,6 +92,16 @@ async def fetch_feed(client: httpx.AsyncClient, url: str):
     except Exception as e:
         log.warning("Fetch imeshindwa %s: %s", url, e)
         return None
+
+
+async def fetch_feed(url: str, client: httpx.AsyncClient | None = None):
+    """Inafanya kazi kama ya zamani: fetch_feed(url). Client ni hiari (job inashiriki moja)."""
+    if client is not None:
+        return await _fetch(client, url)
+    async with httpx.AsyncClient(
+        timeout=15, follow_redirects=False, headers=HEADERS
+    ) as c:
+        return await _fetch(c, url)
 
 
 # ---------- Job ----------
@@ -175,7 +190,7 @@ async def rss_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
         async def run(url: str, chats: list[int]) -> None:
             async with sem:
-                feed = await fetch_feed(client, url)
+                feed = await _fetch(client, url)
             if not feed or not feed.entries:
                 return
             for chat_id in chats:
