@@ -16,7 +16,7 @@ from telegram.ext import (
 )
 
 from modules.msghandler import texttu
-from modules.Rss.rss_cmd import rs, rmv
+from modules.Rss.rss_cmd import rs, rmv, vw
 from modules.Rss.rss_updt import start_rss_job
 
 
@@ -97,6 +97,15 @@ def register_handlers(application: Application) -> None:
         CommandHandler(
             "rmv",
             rmv,
+            filters=filters.UpdateType.MESSAGE | filters.UpdateType.CHANNEL_POST,
+        )
+    )
+
+    # /vw — muundo wa post za RSS (hidden | show)
+    application.add_handler(
+        CommandHandler(
+            "vw",
+            vw,
             filters=filters.UpdateType.MESSAGE | filters.UpdateType.CHANNEL_POST,
         )
     )
