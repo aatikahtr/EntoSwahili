@@ -15,7 +15,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from . import rss_db as db
-from .rss_updt import feed_keys, fetch_feed, is_safe_url
+from .rss_updt import ERRORS, feed_keys, fetch_feed, is_safe_url
 
 USAGE = (
     "📖 Amri za /rs:\n"
@@ -209,7 +209,7 @@ async def rs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     continue
                 feed = await fetch_feed(target)
                 if not feed or not feed.entries:
-                    results.append(f"❌ Si RSS sahihi / haina entries: {target}")
+                    results.append(f"❌ {target}\n   Sababu: {ERRORS.get(target, 'si RSS sahihi / haina entries')}")
                     continue
                 # hifadhi zilizopo ili zisitumwe upya
                 ids = feed_keys(feed)
@@ -259,7 +259,7 @@ async def rs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 return await reply("❌ Link si sahihi.")
             feed = await fetch_feed(target)
             if not feed or not feed.entries:
-                return await reply("❌ Si RSS sahihi au haina entries.")
+                return await reply(f"❌ Imeshindwa: {ERRORS.get(target, 'si RSS sahihi au haina entries')}")
             first = feed.entries[0]
             return await reply(
                 f"✅ RSS sahihi\n"
@@ -273,5 +273,4 @@ async def rs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     except Exception as e:
         await reply(f"❌ Hitilafu: {type(e).__name__}")
-        raise   await reply(f"❌ Hitilafu: {type(e).__name__}")
         raise
