@@ -273,4 +273,5 @@ async def rs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     except Exception as e:
         await reply(f"❌ Hitilafu: {type(e).__name__}")
+        raise   await reply(f"❌ Hitilafu: {type(e).__name__}")
         raise
