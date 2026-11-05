@@ -24,7 +24,7 @@ _ready = False
 
 
 def make_key(chat_id, url: str) -> str:
-    return f"{chat_id}|{url}"
+    return f"{int(chat_id)}|{url}"  # int() ili aina ya chat_id isiathiri key
 
 
 async def init() -> None:
@@ -93,6 +93,13 @@ async def remove_feed(chat_id: int, url: str) -> bool:
     await init()
     res = await _col.delete_one({"_id": make_key(chat_id, url)})
     return res.deleted_count > 0
+
+
+async def remove_all(chat_id: int) -> int:
+    """Futa feeds ZOTE za chat_id hii tu (chats nyingine haziguswi). Rudisha idadi."""
+    await init()
+    res = await _col.delete_many({"chat_id": int(chat_id)})
+    return res.deleted_count
 
 
 async def all_feeds() -> list:
