@@ -7,6 +7,7 @@
 /rs help                   - msaada
 /rmv url|namba [...]       - futa feed kutoka MongoDB (chat hii tu)
 /rmv all                   - futa feeds ZOTE za chat hii tu
+/vw hidden|show            - muundo wa post: link imefichwa kwenye kichwa | kichwa + link wazi
 """
 import asyncio
 import time
@@ -25,7 +26,9 @@ USAGE = (
     "/rs latest url|namba [idadi]\n"
     "/rs test url\n"
     "/rmv url|namba [...]  — futa feed kutoka database\n"
-    "/rmv all  — futa feeds zote za chat hii tu"
+    "/rmv all  — futa feeds zote za chat hii tu\n"
+    "/vw hidden  — kichwa cha post kiwe link (url imefichwa)\n"
+    "/vw show  — kichwa kisha link wazi chini yake"
 )
 MAX_FEEDS = 20       # kwa kila chat
 MAX_ADD_AT_ONCE = 5
@@ -154,6 +157,31 @@ async def rmv(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     _, chat_id, reply = g
     try:
         await _remove(chat_id, context.args or [], reply)
+    except Exception as e:
+        await reply(f"❌ Hitilafu: {type(e).__name__}")
+        raise
+
+
+async def vw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/vw hidden | /vw show | /vw (hali ya sasa). Inahifadhiwa kwa chat hii tu."""
+    g = await _guarded(update, context)
+    if not g:
+        return
+    _, chat_id, reply = g
+    arg = (context.args[0].lower() if context.args else "")
+    try:
+        if arg in ("hidden", "hide", "h"):
+            await db.set_view(chat_id, "hidden")
+            return await reply("✅ Muundo: hidden — kichwa cha post ni link (url imefichwa).")
+        if arg in ("show", "s"):
+            await db.set_view(chat_id, "show")
+            return await reply(
+                "✅ Muundo: show — post itatumwa hivi:\n\n"
+                "Nijitolee figo na kupewa gari?\n"
+                "https://firqatunnajia.com/nijitolee-figo-na-kupewa-gari/"
+            )
+        cur = await db.get_view(chat_id)
+        await reply(f"Muundo wa sasa: {cur}\n/vw hidden\n/vw show")
     except Exception as e:
         await reply(f"❌ Hitilafu: {type(e).__name__}")
         raise
