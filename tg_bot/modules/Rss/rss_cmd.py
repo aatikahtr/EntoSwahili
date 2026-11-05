@@ -5,14 +5,17 @@
 /rs latest url|namba [n]   - posts za hivi karibuni
 /rs test url               - jaribu link bila kuhifadhi
 /rs help                   - msaada
+/rmv url|namba [...]       - futa feed kutoka MongoDB (chat hii tu)
+/rmv all                   - futa feeds ZOTE za chat hii tu
 """
 import asyncio
+import time
 
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from . import rss_db as db
-from .rss_updt import entry_id, fetch_feed, is_safe_url
+from .rss_updt import feed_keys, fetch_feed, is_safe_url
 
 USAGE = (
     "📖 Amri za /rs:\n"
@@ -20,11 +23,17 @@ USAGE = (
     "/rs add url [url2 ...]  (hadi 5)\n"
     "/rs stop url|namba [...]  au  /rs stop all\n"
     "/rs latest url|namba [idadi]\n"
-    "/rs test url"
+    "/rs test url\n"
+    "/rmv url|namba [...]  — futa feed kutoka database\n"
+    "/rmv all  — futa feeds zote za chat hii tu"
 )
 MAX_FEEDS = 20       # kwa kila chat
 MAX_ADD_AT_ONCE = 5
 MAX_LATEST = 5
+TITLE_TTL = 6 * 3600     # jina la feed linakaa cache masaa 6
+TITLE_MAX = 500          # kikomo cha cache
+TITLE_CONCURRENCY = 5    # feeds zinazopakuliwa kwa wakati mmoja kwenye /rs list
+_title_sem = asyncio.Semaphore(TITLE_CONCURRENCY)
 TG_LIMIT = 4000      # Telegram ina kikomo cha 4096
 
 ALIASES = {
@@ -65,27 +74,62 @@ def _resolve(token: str, urls: list[str]) -> str | None:
     return _normalize(token)
 
 
-_TITLES: dict[str, str] = {}  # cache: url -> jina (inaondoka bot ikizimwa, inajijaza tena)
+_TITLES: dict[str, tuple[float, str]] = {}  # url -> (muda, jina)
+
+
+def _cache_title(url: str, title: str) -> None:
+    if len(_TITLES) >= TITLE_MAX:  # ondoa ya zamani zaidi
+        _TITLES.pop(min(_TITLES, key=lambda k: _TITLES[k][0]), None)
+    _TITLES[url] = (time.time(), title)
 
 
 async def _title_of(url: str) -> str:
-    if url in _TITLES:
-        return _TITLES[url]
+    hit = _TITLES.get(url)
+    if hit and time.time() - hit[0] < TITLE_TTL:
+        return hit[1]
     try:
-        feed = await asyncio.wait_for(fetch_feed(url), timeout=15)
+        async with _title_sem:
+            feed = await asyncio.wait_for(fetch_feed(url), timeout=15)
         title = (feed.feed.get("title") or "").strip() if feed else ""
         if title:
-            _TITLES[url] = title
+            _cache_title(url, title)
             return title
     except Exception:
         pass
     return "(jina halipatikani)"
 
 
-async def rs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def _remove(chat_id: int, rest: list, reply) -> None:
+    """Mantiki ya pamoja: /rmv na /rs stop. Inafuta MongoDB kwa chat_id hii tu."""
+    if not rest:
+        return await reply("Tumia: /rmv url|namba [...]  au  /rmv all")
+    urls = await db.list_urls(chat_id)
+
+    if rest[0].lower() == "all":
+        if not urls:
+            return await reply("Hakuna cha kuondoa.")
+        removed = await db.remove_all(chat_id)  # chat_id hii tu
+        return await reply(f"🗑️ Feeds {removed} zimefutwa kutoka database.")
+
+    # tatua namba zote kwanza (kabla ya kuondoa, ili namba zisibadilike)
+    targets = [(tok, _resolve(tok, urls)) for tok in rest]
+    results = []
+    for tok, t in targets:
+        if t is None:
+            results.append(f"❌ Namba {tok} haipo")
+        elif await db.remove_feed(chat_id, t):
+            _TITLES.pop(t, None)
+            results.append(f"🗑️ {t}")
+        else:
+            results.append(f"❌ Haipo kwenye orodha: {t}")
+    await reply("\n".join(results))
+
+
+async def _guarded(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Rudisha (msg, chat_id, reply) au None kama hairuhusiwi."""
     msg = update.channel_post or update.message
     if not msg:
-        return
+        return None
 
     async def reply(text: str):
         if len(text) > TG_LIMIT:
@@ -97,9 +141,30 @@ async def rs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
     if not await _can_manage(msg, context):
-        return await reply("⛔ Admins tu ndio wanaweza kutumia /rs hapa.")
+        await reply("⛔ Admins tu ndio wanaweza kutumia amri hii hapa.")
+        return None
+    return msg, msg.chat.id, reply
 
-    chat_id = msg.chat.id
+
+async def rmv(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/rmv url|namba [...]  |  /rmv all"""
+    g = await _guarded(update, context)
+    if not g:
+        return
+    _, chat_id, reply = g
+    try:
+        await _remove(chat_id, context.args or [], reply)
+    except Exception as e:
+        await reply(f"❌ Hitilafu: {type(e).__name__}")
+        raise
+
+
+async def rs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    g = await _guarded(update, context)
+    if not g:
+        return
+    msg, chat_id, reply = g
+
     args = context.args or []
     action = ALIASES.get(args[0].lower(), args[0].lower()) if args else "list"
     rest = args[1:]
@@ -147,46 +212,19 @@ async def rs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     results.append(f"❌ Si RSS sahihi / haina entries: {target}")
                     continue
                 # hifadhi zilizopo ili zisitumwe upya
-                ids = [entry_id(e) for e in feed.entries if entry_id(e)]
+                ids = feed_keys(feed)
                 if not await db.add_feed(chat_id, target, ids):
                     results.append(f"⚠️ Tayari ipo: {target}")
                     continue
                 count += 1
                 if feed.feed.get("title"):
-                    _TITLES[target] = feed.feed["title"].strip()
+                    _cache_title(target, feed.feed["title"].strip())
                 results.append(f"✅ {feed.feed.get('title', target)}")
             return await reply("\n".join(results))
 
-        # ---------- /rs stop url|namba [...] | all ----------
+        # ---------- /rs stop (sawa na /rmv) ----------
         if action == "stop":
-            if not rest:
-                return await reply("Tumia: /rs stop url|namba [...]  au  /rs stop all")
-            urls = await db.list_urls(chat_id)
-
-            if rest[0].lower() == "all":
-                if not urls:
-                    return await reply("Hakuna cha kuondoa.")
-                removed = 0
-                for u in urls:
-                    if await db.remove_feed(chat_id, u):
-                        removed += 1
-                return await reply(f"🛑 Feeds {removed} zimesimamishwa.")
-
-            # tatua namba zote kwanza (kabla ya kuondoa, ili namba zisibadilike)
-            targets = []
-            for tok in rest:
-                t = _resolve(tok, urls)
-                targets.append((tok, t))
-
-            results = []
-            for tok, t in targets:
-                if t is None:
-                    results.append(f"❌ Namba {tok} haipo")
-                elif await db.remove_feed(chat_id, t):
-                    results.append(f"🛑 {t}")
-                else:
-                    results.append(f"❌ Haipo kwenye orodha: {t}")
-            return await reply("\n".join(results))
+            return await _remove(chat_id, rest, reply)
 
         # ---------- /rs latest url|namba [idadi] ----------
         if action == "latest":
