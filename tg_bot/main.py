@@ -16,7 +16,7 @@ from telegram.ext import (
 )
 
 from modules.msghandler import texttu
-from modules.Rss.rss_cmd import rs
+from modules.Rss.rss_cmd import rs, rmv
 from modules.Rss.rss_updt import start_rss_job
 
 
@@ -88,6 +88,15 @@ def register_handlers(application: Application) -> None:
         CommandHandler(
             "rs",
             rs,
+            filters=filters.UpdateType.MESSAGE | filters.UpdateType.CHANNEL_POST,
+        )
+    )
+
+    # /rmv — futa RSS kutoka MongoDB (chat hii tu)
+    application.add_handler(
+        CommandHandler(
+            "rmv",
+            rmv,
             filters=filters.UpdateType.MESSAGE | filters.UpdateType.CHANNEL_POST,
         )
     )
