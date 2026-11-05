@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 INTERVAL = 300          # sekunde (dakika 5)
 MAX_PER_CYCLE = 10      # entries za juu kwa kila feed kwa mzunguko mmoja
-MAX_SEEN = 2000         # kila entry inaweza kuhifadhi keys 2 (id + link)
+MAX_SEEN = 3000         # kila entry inaweza kuhifadhi keys 2 (id + link)
 MAX_BYTES = 2_000_000   # kikomo cha ukubwa wa feed
 MAX_REDIRECTS = 3
 CONCURRENCY = 10        # feeds zinazopakuliwa kwa wakati mmoja
@@ -46,6 +46,13 @@ def entry_keys(entry, dup_links: set) -> list:
         if raw != "|":
             keys.append("h:" + hashlib.sha1(raw.encode("utf-8", "ignore")).hexdigest())
     return keys
+
+
+def feed_keys(feed) -> list:
+    """Keys zote za feed (zinatumika na /rs add na job ili baseline ilingane)."""
+    link_counts = Counter(e.get("link") for e in feed.entries if e.get("link"))
+    dup_links = {l for l, n in link_counts.items() if n > 1}
+    return list(dict.fromkeys(k for e in feed.entries for k in entry_keys(e, dup_links)))
 
 
 # ---------- Usalama + Fetch ----------
@@ -142,13 +149,20 @@ async def _process(bot, chat_id: int, url: str, feed) -> None:
     exists, old = await db.get_ids(chat_id, url)
     if not exists:  # imefutwa wakati job inaendesha
         return
-    if old is None:  # hakuna rekodi: hifadhi baseline, tuma post ya hivi karibuni tu
+
+    if old is None:  # hakuna baseline: tuma post ya hivi karibuni, kisha hifadhi
+        res = await _send(bot, chat_id, format_entry(feed.entries[0], latest=True))
+        if res == "stop":  # chat haipatikani -> ondoa feed
+            await db.remove_feed(chat_id, url)
+            log.info("Feed imeondolewa (chat imefungwa): %s|%s", chat_id, url)
+            return
+        if res == "retry":  # usihifadhi baseline, jaribu tena mzunguko ujao
+            return
         await db.set_ids(chat_id, url, current[:MAX_SEEN])
         log.info("Baseline imehifadhiwa: %s|%s", chat_id, url)
-        await _send(bot, chat_id, format_entry(feed.entries[0], latest=True))
         return
-    old_set = set(old)
 
+    old_set = set(old)
     new = [
         e for e in feed.entries
         if keys[id(e)] and not any(k in old_set for k in keys[id(e)])
@@ -161,8 +175,10 @@ async def _process(bot, chat_id: int, url: str, feed) -> None:
         if res == "retry":
             unsent = {k for x in new[i:] for k in keys[id(x)]}  # zitajaribiwa tena
             break
-        if res == "stop":
-            break
+        if res == "stop":  # bot amezuiwa/ametolewa -> futa usajili wote wa feed hii
+            await db.remove_feed(chat_id, url)
+            log.info("Feed imeondolewa (chat imefungwa): %s|%s", chat_id, url)
+            return
         await asyncio.sleep(1)  # epuka flood limit
 
     kept = [i for i in current if i not in unsent]
@@ -204,4 +220,7 @@ async def rss_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def start_rss_job(app) -> None:
     """Iite mara moja kwenye main baada ya kutengeneza app."""
-    app.job_queue.run_repeating(rss_job, interval=INTERVAL, first=10)
+    app.job_queue.run_repeating(
+        rss_job, interval=INTERVAL, first=10,
+        job_kwargs={"max_instances": 1, "coalesce": True},  # zuia mizunguko kuingiliana
+    )
