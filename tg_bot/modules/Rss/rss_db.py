@@ -20,7 +20,9 @@ if not MONGO_URI:
 
 _client = AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=10000)
 _col = _client[os.getenv("MONGO_DB", "entoswahili")]["rss_feeds"]
+_settings = _client[os.getenv("MONGO_DB", "entoswahili")]["rss_settings"]
 _ready = False
+VIEW_MODES = ("show", "hidden")
 
 
 def make_key(chat_id, url: str) -> str:
@@ -119,3 +121,16 @@ async def get_ids(chat_id: int, url: str):
 async def set_ids(chat_id: int, url: str, ids: list) -> None:
     """Haifanyi chochote kama feed imeshafutwa (haifufui usajili)."""
     await _col.update_one({"_id": make_key(chat_id, url)}, {"$set": {"ids": ids}})
+
+
+async def get_view(chat_id: int) -> str:
+    """Muundo wa post za chat hii: 'show' (kawaida) au 'hidden'."""
+    doc = await _settings.find_one({"_id": int(chat_id)}, {"view": 1})
+    view = (doc or {}).get("view", "show")
+    return view if view in VIEW_MODES else "show"
+
+
+async def set_view(chat_id: int, view: str) -> None:
+    await _settings.update_one(
+        {"_id": int(chat_id)}, {"$set": {"view": view}}, upsert=True
+    )
