@@ -19,11 +19,19 @@ log = logging.getLogger(__name__)
 INTERVAL = 300          # sekunde (dakika 5)
 MAX_PER_CYCLE = 10      # entries za juu kwa kila feed kwa mzunguko mmoja
 MAX_SEEN = 3000         # kila entry inaweza kuhifadhi keys 2 (id + link)
-MAX_BYTES = 2_000_000   # kikomo cha ukubwa wa feed
+MAX_BYTES = 5_000_000   # kikomo cha ukubwa wa feed (feeds za WordPress zenye maudhui kamili ni kubwa)
 MAX_REDIRECTS = 3
 CONCURRENCY = 10        # feeds zinazopakuliwa kwa wakati mmoja
 MAX_TEXT = 4000         # Telegram: 4096
-HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; RSSBot/1.0)"}
+HEADERS = {  # tovuti nyingi (Cloudflare/Wordfence) huzuia UA ya bot; tumia ya kivinjari
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    ),
+    "Accept": "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5",
+    "Accept-Language": "en-US,en;q=0.8,sw;q=0.6",
+}
+ERRORS: dict = {}  # url -> sababu ya kushindwa mara ya mwisho (kwa /rs test na /rs add)
 
 
 def entry_id(entry) -> str:
@@ -74,31 +82,40 @@ async def is_safe_url(url: str) -> bool:
 
 async def _fetch(client: httpx.AsyncClient, url: str):
     """Pakua kwa usalama (redirects zinakaguliwa, ukubwa umewekewa kikomo) kisha parse."""
+    orig = url
+
+    def fail(reason: str):
+        ERRORS[orig] = reason
+        log.warning("Fetch imeshindwa %s: %s", orig, reason)
+        return None
+
     try:
         for _ in range(MAX_REDIRECTS + 1):
             if not await is_safe_url(url):
-                log.warning("URL si salama: %s", url)
-                return None
+                return fail("link si salama / DNS imeshindwa")
             async with client.stream("GET", url) as r:
                 if r.is_redirect:
                     loc = r.headers.get("location")
                     if not loc:
-                        return None
+                        return fail("redirect bila location")
                     url = urljoin(url, loc)
                     continue
-                r.raise_for_status()
+                if r.status_code >= 400:
+                    return fail(f"HTTP {r.status_code} (seva imekataa bot)")
                 buf = bytearray()
                 async for chunk in r.aiter_bytes():
                     buf += chunk
                     if len(buf) > MAX_BYTES:
-                        log.warning("Feed kubwa mno: %s", url)
-                        return None
-            return await asyncio.to_thread(feedparser.parse, bytes(buf))
-        log.warning("Redirects nyingi mno: %s", url)
-        return None
+                        return fail(f"feed kubwa mno (>{MAX_BYTES // 1_000_000}MB)")
+            feed = await asyncio.to_thread(feedparser.parse, bytes(buf))
+            if not feed.entries:
+                why = type(feed.get("bozo_exception", "")).__name__ if feed.get("bozo") else "hakuna entries"
+                return fail(f"si RSS/Atom sahihi ({why})")
+            ERRORS.pop(orig, None)
+            return feed
+        return fail("redirects nyingi mno")
     except Exception as e:
-        log.warning("Fetch imeshindwa %s: %s", url, e)
-        return None
+        return fail(f"{type(e).__name__}: {e}")
 
 
 async def fetch_feed(url: str, client: httpx.AsyncClient | None = None):
