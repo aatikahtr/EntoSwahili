@@ -1,6 +1,7 @@
 """Rss/rss_updt.py - Hukagua RSS feeds kila baada ya muda na kutuma updates mpya."""
 import asyncio
 import hashlib
+import html
 import ipaddress
 import logging
 import socket
@@ -9,6 +10,7 @@ from urllib.parse import urljoin, urlparse
 
 import feedparser
 import httpx
+from telegram.constants import ParseMode
 from telegram.error import BadRequest, Forbidden, RetryAfter
 from telegram.ext import ContextTypes
 
@@ -129,11 +131,15 @@ async def fetch_feed(url: str, client: httpx.AsyncClient | None = None):
 
 
 # ---------- Job ----------
-async def _send(bot, chat_id: int, text: str) -> str:
+async def _send(bot, chat_id: int, text: str, as_html: bool = False) -> str:
     """Rudisha: 'ok' | 'skip' (entry hii tu) | 'stop' (chat haipatikani) | 'retry'."""
     for attempt in range(2):
         try:
-            await bot.send_message(chat_id=chat_id, text=text[:MAX_TEXT])
+            await bot.send_message(
+                chat_id=chat_id,
+                text=text[:MAX_TEXT],
+                parse_mode=ParseMode.HTML if as_html else None,
+            )
             return "ok"
         except RetryAfter as e:
             if attempt == 0:
@@ -152,8 +158,16 @@ async def _send(bot, chat_id: int, text: str) -> str:
     return "retry"
 
 
-def format_entry(e, latest: bool = False) -> str:
-    text = f"{e.get('title', '')}\n{e.get('link', '')}"
+def format_entry(e, latest: bool = False, hidden: bool = False) -> str:
+    """show   : kichwa + link wazi (mstari unaofuata)
+    hidden : kichwa kinakuwa link (url imefichwa nyuma ya kichwa), HTML"""
+    title = (e.get("title") or "").strip()
+    link = (e.get("link") or "").strip()
+    if hidden and link:
+        head = html.escape(title[:300] or link)
+        text = f'<a href="{html.escape(link, quote=True)}">{head}</a>'
+    else:
+        text = f"{title}\n{link}"
     return f"🆕 Latest post\n{text}" if latest else text
 
 
@@ -166,9 +180,12 @@ async def _process(bot, chat_id: int, url: str, feed) -> None:
     exists, old = await db.get_ids(chat_id, url)
     if not exists:  # imefutwa wakati job inaendesha
         return
+    hidden = (await db.get_view(chat_id)) == "hidden"
 
     if old is None:  # hakuna baseline: tuma post ya hivi karibuni, kisha hifadhi
-        res = await _send(bot, chat_id, format_entry(feed.entries[0], latest=True))
+        res = await _send(
+            bot, chat_id, format_entry(feed.entries[0], latest=True, hidden=hidden), hidden
+        )
         if res == "stop":  # chat haipatikani -> ondoa feed
             await db.remove_feed(chat_id, url)
             log.info("Feed imeondolewa (chat imefungwa): %s|%s", chat_id, url)
@@ -188,7 +205,7 @@ async def _process(bot, chat_id: int, url: str, feed) -> None:
 
     unsent = set()
     for i, e in enumerate(new):
-        res = await _send(bot, chat_id, format_entry(e))
+        res = await _send(bot, chat_id, format_entry(e, hidden=hidden), hidden)
         if res == "retry":
             unsent = {k for x in new[i:] for k in keys[id(x)]}  # zitajaribiwa tena
             break
