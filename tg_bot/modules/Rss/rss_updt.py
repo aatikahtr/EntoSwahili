@@ -31,9 +31,11 @@ log = logging.getLogger(__name__)
 
 INTERVAL = 300            # sekunde (dakika 5)
 MAX_PER_CYCLE = 10        # posts za kutuma kwa kila feed kwa mzunguko mmoja (zilizobaki zinaenda mzunguko ujao)
-MAX_BACKLOG = 30          # zaidi ya hapa: za zamani zinarukwa kwa makusudi na mtumiaji anaarifiwa
+MAX_ENTRIES = 50          # feeds kubwa (mamia ya posts): tunatazama entries 50 za juu tu
+MAX_BACKLOG = 50          # zaidi ya hapa: za zamani zinarukwa kwa makusudi na mtumiaji anaarifiwa
 MAX_SEEN = 3000           # tokens za mwisho zinazohifadhiwa kwa kila feed
-MAX_BYTES = 5_000_000     # kikomo cha ukubwa wa feed
+MAX_BYTES = 10_000_000    # kikomo cha ukubwa wa feed (feeds za WordPress zenye maudhui kamili ni kubwa)
+RETRY_DELAY = 3           # sekunde kabla ya kujaribu tena kosa la muda (timeout, 5xx, feed iliyokatika)
 MAX_REDIRECTS = 3
 CONCURRENCY = 10          # feeds zinazopakuliwa kwa wakati mmoja
 MAX_TEXT = 4000           # Telegram: 4096
@@ -54,6 +56,7 @@ HEADERS = {  # tovuti nyingi (Cloudflare/Wordfence) huzuia UA ya bot; tumia ya k
     "Accept-Language": "en-US,en;q=0.8,sw;q=0.6",
 }
 # Muunganisho haurudiwi: tunaunganisha kwa IP + SNI maalum, kwa hiyo pool isishiriki connections
+TIMEOUT = httpx.Timeout(30.0, connect=10.0)  # feeds nzito huchelewa kutoka
 LIMITS = httpx.Limits(max_keepalive_connections=0, max_connections=50)
 
 ERRORS: dict = {}  # url -> sababu ya kushindwa mara ya mwisho (kwa /rs test na /rs add)
@@ -103,13 +106,19 @@ def _stamp(e):
         return None
 
 
-def sort_entries(entries) -> list:
+def _newest_first(entries) -> bool:
+    """Feed nyingi huorodhesha mpya kwanza. Tunagundua kinyume (oldest-first) kwa tarehe zilizopo."""
+    dated = [s for s in map(_stamp, entries) if s is not None]
+    return not (len(dated) >= 2 and dated[0] < dated[-1])
+
+
+def sort_entries(entries, newest_first: bool | None = None) -> list:
     """Rudisha entries za zamani kwanza -> mpya mwisho.
-    Tarehe zikiwepo kwa zote: zinapangwa kwa tarehe. Vinginevyo: tunagundua mwelekeo wa feed
-    kutoka tarehe zilizopo; bila tarehe kabisa tunadhani mpya ziko juu (kawaida)."""
+    Tarehe zikiwepo kwa zote: zinapangwa kwa tarehe. Vinginevyo tunategemea mwelekeo wa feed."""
     es = list(entries)
-    dated = [s for s in map(_stamp, es) if s is not None]
-    if not (len(dated) >= 2 and dated[0] < dated[-1]):
+    if newest_first is None:
+        newest_first = _newest_first(es)
+    if newest_first:
         es.reverse()  # feed ilikuwa mpya-kwanza -> sasa za zamani kwanza
     stamps = [_stamp(e) for e in es]
     if es and all(s is not None for s in stamps):
@@ -118,8 +127,15 @@ def sort_entries(entries) -> list:
 
 
 def prepare(feed) -> list:
-    """Orodha ya (entry, [tokens]) kwa mpangilio wa muda (za zamani kwanza)."""
-    entries = sort_entries(feed.entries)
+    """Orodha ya (entry, [tokens]) kwa mpangilio wa muda (za zamani kwanza).
+    Feed kubwa (mfano posts 500): tunachukua MAX_ENTRIES za 'mpya' tu (kwa nafasi kwenye feed,
+    kwa sababu tarehe zinaweza kuwa zimechanganyika kwa posts zilizopangwa), ili baseline na
+    ulinganisho viwe vidogo na thabiti."""
+    es = list(feed.entries)
+    nf = _newest_first(es)
+    if len(es) > MAX_ENTRIES:
+        es = es[:MAX_ENTRIES] if nf else es[-MAX_ENTRIES:]
+    entries = sort_entries(es, nf)
     counts = Counter(e.get("link") for e in entries if e.get("link"))
     dup_links = {l for l, n in counts.items() if n > 1}
     out = []
@@ -230,7 +246,30 @@ async def _request(client: httpx.AsyncClient, url: str, ip: str, etag, modified)
         return "ok", bytes(buf), r.headers
 
 
+def _looks_complete(data: bytes) -> bool:
+    """XML iliyokatika nusu (PHP/seva imekata jibu) inaweza kuparse vizuri kwa entries chache tu.
+    Baseline ya namna hiyo ndiyo inayosababisha mamia ya posts 'mpya' baadaye. Kataa feed isiyo na tag ya mwisho."""
+    tail = data[-1500:].lower()
+    return any(t in tail for t in (b"</rss>", b"</feed>", b"</rdf:rdf>"))
+
+
+_TRANSIENT = (
+    "imeshindwa kuunganisha", "feed imekatika", "HTTP 5", "HTTP 429",
+    "ReadTimeout", "ConnectTimeout", "WriteTimeout", "PoolTimeout",
+    "ReadError", "RemoteProtocolError", "ConnectError", "TimeoutException",
+)
+
+
 async def _fetch(client: httpx.AsyncClient, url: str, etag=None, modified=None):
+    """Kama _fetch_once, lakini inajaribu tena mara moja kwa makosa ya muda (timeout, 5xx, feed iliyokatika)."""
+    res = await _fetch_once(client, url, etag, modified)
+    if res is None and str(ERRORS.get(url, "")).startswith(_TRANSIENT):
+        await asyncio.sleep(RETRY_DELAY)
+        res = await _fetch_once(client, url, etag, modified)
+    return res
+
+
+async def _fetch_once(client: httpx.AsyncClient, url: str, etag=None, modified=None):
     """Rudisha: feed | NOT_MODIFIED | None (imeshindwa; sababu iko kwenye ERRORS)."""
     orig = url
 
@@ -270,6 +309,8 @@ async def _fetch(client: httpx.AsyncClient, url: str, etag=None, modified=None):
             if kind == "toobig":
                 return fail(f"feed kubwa mno (>{MAX_BYTES // 1_000_000}MB)")
 
+            if not _looks_complete(data):
+                return fail("feed imekatika nusu (seva imekata jibu kabla ya mwisho)")
             feed = await asyncio.to_thread(feedparser.parse, data)
             if not feed.entries:
                 why = type(feed.get("bozo_exception", "")).__name__ if feed.get("bozo") else "hakuna entries"
@@ -288,7 +329,7 @@ async def fetch_feed(url: str, client: httpx.AsyncClient | None = None):
     if client is not None:
         return await _fetch(client, url)
     async with httpx.AsyncClient(
-        timeout=15, follow_redirects=False, headers=HEADERS, limits=LIMITS
+        timeout=TIMEOUT, follow_redirects=False, headers=HEADERS, limits=LIMITS
     ) as c:
         return await _fetch(c, url)
 
@@ -519,7 +560,7 @@ async def rss_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     sem = asyncio.Semaphore(CONCURRENCY)
 
     async with httpx.AsyncClient(
-        timeout=15, follow_redirects=False, headers=HEADERS, limits=LIMITS
+        timeout=TIMEOUT, follow_redirects=False, headers=HEADERS, limits=LIMITS
     ) as client:
 
         async def run(url: str, docs: list) -> None:
