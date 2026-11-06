@@ -16,7 +16,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from . import rss_db as db
-from .rss_updt import ERRORS, feed_keys, fetch_feed, is_safe_url
+from .rss_updt import ERRORS, WARN_AFTER_DAYS, feed_keys, fetch_feed, url_status
 
 USAGE = (
     "📖 Amri za /rs:\n"
@@ -232,22 +232,36 @@ async def rs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 if count >= MAX_FEEDS:
                     results.append(f"⚠️ Kikomo {MAX_FEEDS} kimefika: {target}")
                     continue
-                if not await is_safe_url(target):
+                # Link mbovu / ya ndani tu ndizo zinakataliwa daima. DNS kushindwa ni tatizo la muda.
+                if await url_status(target) == "unsafe":
                     results.append(f"❌ Link si sahihi: {target}")
                     continue
+
                 feed = await fetch_feed(target)
-                if not feed or not feed.entries:
-                    results.append(f"❌ {target}\n   Sababu: {ERRORS.get(target, 'si RSS sahihi / haina entries')}")
+                if feed and feed.entries:
+                    # hifadhi zilizopo ili zisitumwe upya
+                    if not await db.add_feed(chat_id, target, feed_keys(feed)):
+                        results.append(f"⚠️ Tayari ipo: {target}")
+                        continue
+                    count += 1
+                    if feed.feed.get("title"):
+                        _cache_title(target, feed.feed["title"].strip())
+                    results.append(f"✅ {feed.feed.get('title', target)}")
                     continue
-                # hifadhi zilizopo ili zisitumwe upya
-                ids = feed_keys(feed)
-                if not await db.add_feed(chat_id, target, ids):
+
+                # Imeshindwa sasa (seva inaweza kuwa busy/inazuia kwa muda): ongeza hata hivyo.
+                # ids=None -> job itaiweka baseline na kutuma post ya hivi karibuni itakapoanza kufanya kazi.
+                reason = ERRORS.get(target, "si RSS sahihi / haina entries")
+                if not await db.add_feed(chat_id, target, None):
                     results.append(f"⚠️ Tayari ipo: {target}")
                     continue
                 count += 1
-                if feed.feed.get("title"):
-                    _cache_title(target, feed.feed["title"].strip())
-                results.append(f"✅ {feed.feed.get('title', target)}")
+                results.append(
+                    f"⏳ {target}\n"
+                    f"   Imeongezwa, ila haisomeki sasa: {reason}\n"
+                    f"   Bot itajaribu tena yenyewe. Isipofanya kazi kwa siku {WARN_AFTER_DAYS}, "
+                    f"utaarifiwa na unaweza kuifuta kwa /rmv."
+                )
             return await reply("\n".join(results))
 
         # ---------- /rs stop (sawa na /rmv) ----------
@@ -283,7 +297,7 @@ async def rs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if not rest:
                 return await reply("Tumia: /rs test url")
             target = _normalize(rest[0])
-            if not await is_safe_url(target):
+            if await url_status(target) == "unsafe":
                 return await reply("❌ Link si sahihi.")
             feed = await fetch_feed(target)
             if not feed or not feed.entries:
