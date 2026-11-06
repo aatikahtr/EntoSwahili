@@ -1,8 +1,16 @@
 """Rss/rss_db.py - Uhifadhi wa RSS kwenye MongoDB (usajili haupotei kwenye redeploy).
 
-Collection moja: rss_feeds
-  { _id: "chat_id|url", chat_id: int, url: str, ids: [..] | None, created: float }
-  ids = None  -> feed mpya bado haijawekewa baseline.
+Collection 1: rss_feeds  (usajili wa kila chat)
+  { _id: "chat_id|url", chat_id: int, url: str, created: float,
+    ids: [token, ...] | None,   # token = "~" + sha1(key)[:16]  (rekodi za zamani za URL kamili zinabadilishwa zenyewe)
+    pending: bool,              # kuna posts bado hazijatumwa (retry / zimezidi MAX_PER_CYCLE)
+    lock_until: float }         # lease: instance moja tu inachakata feed hii kwa wakati mmoja
+  ids = None -> feed mpya bado haijawekewa baseline.
+
+Collection 2: rss_urls  (hali ya kila URL, inashirikiwa na chats zote zinazoitumia)
+  { _id: url, etag, modified, fails, first_fail, next_check, last_error, notified_chats, last_ok }
+
+Collection 3: rss_settings  (muundo wa post kwa kila chat)
 """
 import json
 import logging
@@ -19,8 +27,10 @@ if not MONGO_URI:
     raise RuntimeError("MONGO_URI haijawekwa kwenye environment variables")
 
 _client = AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=10000)
-_col = _client[os.getenv("MONGO_DB", "entoswahili")]["rss_feeds"]
-_settings = _client[os.getenv("MONGO_DB", "entoswahili")]["rss_settings"]
+_db = _client[os.getenv("MONGO_DB", "entoswahili")]
+_col = _db["rss_feeds"]
+_urls = _db["rss_urls"]
+_settings = _db["rss_settings"]
 _ready = False
 VIEW_MODES = ("show", "hidden")
 
@@ -34,7 +44,7 @@ async def init() -> None:
     global _ready
     if _ready:
         return
-    await _col.create_index("chat_id")
+    await _col.create_index([("chat_id", 1), ("created", 1)])
     await _migrate_json()
     _ready = True
 
@@ -72,6 +82,7 @@ async def _migrate_json() -> None:
         log.exception("Migration ya JSON imeshindwa")
 
 
+# ---------- Usajili (rss_feeds) ----------
 async def list_urls(chat_id: int) -> list:
     await init()
     cur = _col.find({"chat_id": chat_id}, {"url": 1}).sort("created", 1)
@@ -106,23 +117,90 @@ async def remove_all(chat_id: int) -> int:
 
 async def all_feeds() -> list:
     await init()
-    return await _col.find({}, {"chat_id": 1, "url": 1}).to_list(None)
+    return await _col.find({}, {"chat_id": 1, "url": 1, "pending": 1, "created": 1}).to_list(None)
+
+
+async def get_feed(chat_id: int, url: str):
+    """Rudisha doc (ids, pending) au None kama imefutwa."""
+    await init()
+    return await _col.find_one({"_id": make_key(chat_id, url)}, {"ids": 1, "pending": 1})
 
 
 async def get_ids(chat_id: int, url: str):
     """Rudisha (exists, ids). ids=None maana baseline haijawekwa."""
-    await init()
-    doc = await _col.find_one({"_id": make_key(chat_id, url)}, {"ids": 1})
+    doc = await get_feed(chat_id, url)
     if doc is None:
         return False, None
     return True, doc.get("ids")
 
 
 async def set_ids(chat_id: int, url: str, ids: list) -> None:
-    """Haifanyi chochote kama feed imeshafutwa (haifufui usajili)."""
+    """Badilisha ids zote (baseline / ubadilishaji wa rekodi za zamani).
+    Haifanyi chochote kama feed imeshafutwa (haifufui usajili)."""
     await _col.update_one({"_id": make_key(chat_id, url)}, {"$set": {"ids": ids}})
 
 
+async def push_ids(chat_id: int, url: str, tokens: list, limit: int) -> None:
+    """Ongeza tokens mwishoni (atomic) na weka mipaka ya `limit` za mwisho tu.
+    Inaitwa baada ya KILA post iliyotumwa, ili crash isisababishe duplicates."""
+    if not tokens:
+        return
+    await _col.update_one(
+        {"_id": make_key(chat_id, url)},
+        {"$push": {"ids": {"$each": list(tokens), "$slice": -int(limit)}}},
+    )
+
+
+async def set_pending(chat_id: int, url: str, flag: bool) -> None:
+    await _col.update_one({"_id": make_key(chat_id, url)}, {"$set": {"pending": bool(flag)}})
+
+
+# ---------- Lease (kuzuia instance mbili kuchakata feed moja) ----------
+async def acquire(chat_id: int, url: str, lease: float) -> bool:
+    """True kama tumepata lock. False kama instance nyingine inaichakata au feed imefutwa."""
+    now = time.time()
+    res = await _col.update_one(
+        {
+            "_id": make_key(chat_id, url),
+            "$or": [{"lock_until": {"$exists": False}}, {"lock_until": {"$lt": now}}],
+        },
+        {"$set": {"lock_until": now + lease}},
+    )
+    return res.modified_count == 1
+
+
+async def release(chat_id: int, url: str) -> None:
+    await _col.update_one({"_id": make_key(chat_id, url)}, {"$set": {"lock_until": 0}})
+
+
+# ---------- Hali ya URL (rss_urls): ETag, backoff, makosa ----------
+async def get_url_states(urls: list) -> dict:
+    if not urls:
+        return {}
+    docs = await _urls.find({"_id": {"$in": list(urls)}}).to_list(None)
+    return {d["_id"]: d for d in docs}
+
+
+async def put_url_state(url: str, set_: dict | None = None, unset: list | None = None) -> None:
+    upd = {}
+    if set_:
+        upd["$set"] = set_
+    if unset:
+        upd["$unset"] = {k: "" for k in unset}
+    if upd:
+        await _urls.update_one({"_id": url}, upd, upsert=True)
+
+
+async def drop_url_state(url: str) -> None:
+    await _urls.delete_one({"_id": url})
+
+
+async def clean_url_states(active_urls: list) -> None:
+    """Futa hali za URL ambazo hakuna chat inayozitumia tena."""
+    await _urls.delete_many({"_id": {"$nin": list(active_urls)}})
+
+
+# ---------- Muundo wa post ----------
 async def get_view(chat_id: int) -> str:
     """Muundo wa post za chat hii: 'show' (kawaida) au 'hidden'."""
     doc = await _settings.find_one({"_id": int(chat_id)}, {"view": 1})
