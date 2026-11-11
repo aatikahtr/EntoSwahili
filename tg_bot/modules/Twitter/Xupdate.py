@@ -1,6 +1,7 @@
 import re
 import httpx
 import logging
+from urllib.parse import urlparse
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram import InputMediaPhoto
@@ -21,10 +22,27 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+_TWITTER_DOMAINS = {"twitter.com", "x.com"}
+
+
 def extract_tweet_id(url: str) -> str | None:
     """Toa Tweet ID kutoka URL yoyote ya X/Twitter/FxTwitter."""
     match = re.search(r'/status/(\d+)', url)
     return match.group(1) if match else None
+
+
+def is_tweet_url(url: str) -> bool:
+    """Kagua URL za X/Twitter na Nitter zenye /status/<tweet_id>."""
+    try:
+        host = (urlparse(url).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return False
+
+    # Kubali twitter.com, x.com pamoja na subdomains zao (mf. mobile.twitter.com).
+    is_twitter = any(host == domain or host.endswith("." + domain) for domain in _TWITTER_DOMAINS)
+    # Nitter ina instances nyingi zenye domains tofauti, kwa hiyo zihifadhi kwa utangamano.
+    is_nitter = "nitter" in host
+    return (is_twitter or is_nitter) and extract_tweet_id(url) is not None
 
 
 async def fetch_tweet_data(tweet_id: str) -> dict | None:
@@ -64,12 +82,10 @@ async def x_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         urls = URL_REGEX.findall(text)
-        if not urls:
+        # Chagua URL ya mwisho inayotoka X/Twitter au Nitter na ina Tweet ID.
+        new_url = next((url for url in reversed(urls) if is_tweet_url(url)), None)
+        if not new_url:
             return
-
-        new_url = urls[-1]
-        if not "nitter" in new_url:
-            return 
 
         # Toa Tweet ID kutoka URL
         tweet_id = extract_tweet_id(new_url)
