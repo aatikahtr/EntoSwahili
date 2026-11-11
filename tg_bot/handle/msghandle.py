@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # ── SETTINGS ─────────────────────────────────────────────────
 # chanzo (chat_id) → mahali Instant View inapotumwa
 ROUTES: dict[int, int] = {
-    1233: -1001248885302,
+    -1003733738728: -1001248885302,
 }
 
 # URL za tovuti hizi HAZIPITI hapa
