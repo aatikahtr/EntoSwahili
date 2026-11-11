@@ -33,6 +33,11 @@ from modules.commands import start
 # ==========
 from modules.Instant_view.instant_command import instant_view_command
 
+# ==========
+# Handle (updates za channel → Instant View)
+# ==========
+from modules.handle.msghandle import msg_handle, ROUTES
+
 # =========
 # Moja moja
 # =========
@@ -149,6 +154,17 @@ def register_handlers(application: Application) -> None:
             mojaone,
         ),
         group=1,
+    )
+
+    # ── HANDLE: channel posts zenye URL → Instant View (group=2, haiingiliani na zingine)
+    application.add_handler(
+        MessageHandler(
+            filters.UpdateType.CHANNEL_POST
+            & filters.Chat(chat_id=list(ROUTES))
+            & (filters.TEXT | filters.CAPTION),
+            msg_handle,
+        ),
+        group=2,
     )
 
 
