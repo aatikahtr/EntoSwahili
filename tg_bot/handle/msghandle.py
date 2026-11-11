@@ -19,7 +19,7 @@ from telegram import Message, Update
 from telegram.ext import ContextTypes
 
 from ID import error_chat_id
-from ..Instant_view.instant_command import make_instant_view
+from modules.Instant_view.instant_command import make_instant_view
 
 logger = logging.getLogger(__name__)
 
