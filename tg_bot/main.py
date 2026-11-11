@@ -21,11 +21,6 @@ from modules.Rss.rss_updt import start_rss_job
 
 
 
-# =========
-# Jalibio
-# =========
-from modules.Instant_view.send_url import send_command
-from modules.Instant_view.IslamSite import get_command
 
 # ===========
 # Translate
