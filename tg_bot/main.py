@@ -36,7 +36,7 @@ from modules.Instant_view.instant_command import instant_view_command
 # ==========
 # Handle (updates za channel → Instant View)
 # ==========
-from modules.handle.msghandle import msg_handle, ROUTES
+from handle.msghandle import msg_handle, ROUTES
 
 # =========
 # Moja moja
