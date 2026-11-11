@@ -8,6 +8,7 @@ Hatua: fetch → title → tafuta content (selectors za site) → futa uchafu �
 
 import asyncio
 import logging
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 import httpx
 from bs4 import BeautifulSoup
@@ -24,6 +25,26 @@ HEADERS = {
     ),
     "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "sw,en-US;q=0.9,en;q=0.8",
+    "Referer": "https://www.google.com/",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "cross-site",
+    "Sec-Fetch-User": "?1",
+}
+
+# Tovuti nyingi (mf. DW) huzuia request inayoonekana kama bot kwa 403.
+# Tunajaribu tena kwa "utambulisho" mwingine — wa kwanza ni browser ya kawaida.
+FALLBACK_AGENTS = (
+    "TelegramBot (like TwitterBot)",
+    "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+)
+RETRY_STATUS = {403, 429, 503}
+
+# Vigezo vya kufuatilia (tracking) kwenye URL — havina uhusiano na makala
+TRACKING_PARAMS = {
+    "maca", "fbclid", "gclid", "igshid", "mc_cid", "mc_eid", "ref", "ref_src",
+    "source", "cmpid", "ocid", "ncid", "spm", "yclid", "_ga",
 }
 
 MAX_PAGE_BYTES = 5_000_000
@@ -32,7 +53,7 @@ SEMAPHORE = asyncio.Semaphore(5)  # zuia requests nyingi kwa wakati mmoja
 _client: httpx.AsyncClient | None = None
 
 HTTP_ERRORS = {
-    403: "Tovuti imekataa ufikiaji (403).",
+    403: "Tovuti imekataa ufikiaji (403) — inazuia bots.",
     404: "Ukurasa haupatikani (404).",
     429: "Maombi mengi sana, jaribu tena baadaye (429).",
 }
@@ -50,11 +71,33 @@ async def _get_client() -> httpx.AsyncClient:
     return _client
 
 
+def clean_url(url: str) -> str:
+    """Ondoa tracking params (maca=, utm_*, fbclid=...) — mara nyingi vinachochea kizuizi cha bot."""
+    parts = urlsplit(url)
+    query = [
+        (k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
+        if k.lower() not in TRACKING_PARAMS and not k.lower().startswith("utm_")
+    ]
+    return urlunsplit(parts._replace(query=urlencode(query), fragment=""))
+
+
+async def _get(client, url: str):
+    """GET; ikipata 403/429/503 jaribu tena kwa user-agent nyingine."""
+    resp = await client.get(url)
+    for ua in FALLBACK_AGENTS:
+        if resp.status_code not in RETRY_STATUS:
+            break
+        logger.info("HTTP %s kwa %s — najaribu tena kama %s", resp.status_code, url, ua.split()[0])
+        await asyncio.sleep(1)
+        resp = await client.get(url, headers={"User-Agent": ua})
+    return resp
+
+
 async def fetch(url: str) -> bytes:
     async with SEMAPHORE:
         client = await _get_client()
         try:
-            resp = await client.get(url)
+            resp = await _get(client, url)
         except httpx.TimeoutException:
             raise ValueError("Tovuti haikujibu kwa wakati.")
         except httpx.RequestError as e:
@@ -124,6 +167,7 @@ def prune(root, selectors: list[str]) -> None:
 
 
 async def extract(url: str, images: bool = True) -> tuple[str, list[str]]:
+    url = clean_url(url)
     content = await fetch(url)
     soup = BeautifulSoup(content, "html.parser")
 
