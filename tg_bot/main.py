@@ -81,7 +81,14 @@ def register_handlers(application: Application) -> None:
 
     # ── Commands ──────────────────────────
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("iv", instant_view_command))
+    # /iv — Instant View + author (private, groups, na channels)
+    application.add_handler(
+        CommandHandler(
+            "iv",
+            instant_view_command,
+            filters=filters.UpdateType.MESSAGE | filters.UpdateType.CHANNEL_POST,
+        )
+    )
 
     # /rs — RSS (private, groups, na channels)
     application.add_handler(
