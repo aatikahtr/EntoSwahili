@@ -82,6 +82,29 @@ def _author(update: Update) -> tuple[str, str]:
     return "Telegram User", "https://t.me/telegram"
 
 
+# ── Kazi ya pamoja: inatumika na /view na na modules/handle/msghandle.py ──
+async def make_instant_view(
+    url: str,
+    author_name: str,
+    author_url: str,
+    text_only: bool = False,
+) -> tuple[str, str]:
+    """
+    Tengeneza Instant View ya url → (title, link ya telegra.ph).
+    Inatupa ValueError kwa makosa yanayoeleweka (403, hakuna maudhui, n.k.).
+    """
+    key = (url, text_only, author_name)
+    hit = _cache.get(key)
+    if hit:
+        return hit
+
+    title, blocks = await extract(url, images=not text_only)
+    link = await publish(title, blocks, author_name, author_url)
+
+    _cache.set(key, (title, link))
+    return title, link
+
+
 # ── Handler ──
 async def instant_view_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
@@ -100,17 +123,10 @@ async def instant_view_command(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     author_name, author_url = _author(update)
-    user_id = update.effective_user.id if update.effective_user else 0
-    key = (url, text_only, user_id)
 
     try:
-        result = _cache.get(key)
-        if result is None:
-            title, blocks = await extract(url, images=not text_only)
-            link = await publish(title, blocks, author_name, author_url)
-            result = f"{title}\n{link}"
-            _cache.set(key, result)
-        await msg.reply_text(result)
+        title, link = await make_instant_view(url, author_name, author_url, text_only)
+        await msg.reply_text(f"{title}\n{link}")
 
     except ValueError as e:
         await msg.reply_text(f"❌ {e}")
