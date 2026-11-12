@@ -8,7 +8,8 @@ instant_command.py — command ya /iv (Instant View)
     /iv new LINK           → tengeneza upya (bila kutumia ya kumbukumbu)
     reply kwenye message yenye link + /iv  (au /iv txt)
 
-  Author (mwandishi anayeonekana kwenye page) — inahifadhiwa MongoDB kwa kila mtumiaji:
+  Author (mwandishi anayeonekana kwenye page) — inahifadhiwa MongoDB kwa kila mtumiaji
+  (au kwa kila channel ukiandika command ndani ya channel):
     /iv author JINA [LINK] → weka jina (na link)
     /iv name JINA          → weka jina tu
     /iv url LINK           → weka link tu
@@ -224,18 +225,25 @@ def _owner_id(update: Update) -> int | None:
     return None
 
 
-async def _get_author(update: Update) -> tuple[str, str]:
-    """Author kutoka MongoDB (kama ameweka), vinginevyo wa kawaida. DB ikishindwa, wa kawaida."""
-    name, url = _default_author(update)
-    owner = _owner_id(update)
-    if owner is None:
-        return name, url
+async def author_for(owner_id: int | None, default_name: str, default_url: str) -> tuple[str, str]:
+    """
+    Author kutoka MongoDB (kama ameweka), vinginevyo wa kawaida.
+    DB ikishindwa/ikichelewa → wa kawaida (Instant View haikwami).
+    Inatumika na /iv na na handle/msghandle.py (owner_id = chat_id ya channel).
+    """
+    if owner_id is None:
+        return default_name, default_url
     try:
-        custom = await asyncio.wait_for(iv_db.get_author(owner), DB_TIMEOUT)
+        custom = await asyncio.wait_for(iv_db.get_author(owner_id), DB_TIMEOUT)
     except Exception:
         logger.exception("iv_db.get_author imeshindwa — natumia author wa kawaida")
-        return name, url
-    return custom.get("name", name), custom.get("url", url)
+        return default_name, default_url
+    return custom.get("name", default_name), custom.get("url", default_url)
+
+
+async def _get_author(update: Update) -> tuple[str, str]:
+    name, url = _default_author(update)
+    return await author_for(_owner_id(update), name, url)
 
 
 def _host(url: str) -> str:
