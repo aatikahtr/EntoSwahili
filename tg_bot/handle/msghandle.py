@@ -19,7 +19,7 @@ from telegram import Message, Update
 from telegram.ext import ContextTypes
 
 from ID import error_chat_id
-from modules.Instant_view.instant_command import make_instant_view
+from modules.Instant_view.instant_command import make_instant_view, author_for
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +80,10 @@ async def msg_handle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if target is None:
         return
 
+    # Command (/iv ...) inashughulikiwa na instant_command — usiichukue kama link ya kiotomatiki
+    if (msg.text or msg.caption or "").lstrip().startswith("/"):
+        return
+
     url = pick_url(msg)
     if url is None:
         return
@@ -97,7 +101,10 @@ async def _send_instant_view(
         chat = msg.chat
         author_url = f"https://t.me/{chat.username}" if chat.username else "https://t.me/telegram"
 
-        title, link = await make_instant_view(url, chat.title or "Telegram", author_url)
+        # Author wa channel: aliyehifadhiwa kwa `/iv author ...` ndani ya channel, la sivyo jina la channel
+        author_name, author_url = await author_for(chat.id, chat.title or "Telegram", author_url)
+
+        title, link = await make_instant_view(url, author_name, author_url)
         await context.bot.send_message(chat_id=target, text=f"{title}\n{link}")
 
     except Exception as e:
