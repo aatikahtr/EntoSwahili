@@ -11,6 +11,7 @@ Funguo zinazoruhusiwa kwa kila site:
     drop_text : regex — block yenye maandishi yanayolingana inaondolewa tu (haikati)
     title     : list ya CSS selectors za title (kama og:title/h1 haitoshi)
     images    : False = site hii iwe text tu
+    lead_image: False = usiweke picha ya kichwa (og:image) juu ya makala (default: True)
 """
 
 from urllib.parse import urlparse
@@ -94,12 +95,20 @@ GLOBAL_REMOVE = [
     ".elementor-widget-share-buttons", ".elementor-widget-post-navigation",
 ]
 
-# Block fupi (≤ 80 herufi) yenye maneno haya inakata makala
+# Block fupi (≤ 80 herufi) INAYOANZA na maneno haya inakata makala — lakini tu baada ya
+# maneno ya kutosha kukusanywa (angalia STOP_MIN_WORDS kwenye cleaner.py), ili
+# "Soma zaidi" ya juu isikate makala yote.
 GLOBAL_STOP = (
-    "bonyeza", "soma zaidi", "endelea kusoma", "read more", "continue reading",
-    "zilizopendekezwa", "makala zinazohusiana", "related posts",
-    "related articles", "you may also like",
+    "endelea kusoma", "continue reading", "read more", "soma zaidi",
+    "zilizopendekezwa", "makala zinazohusiana", "habari zinazohusiana",
+    "related posts", "related articles", "you may also like", "read next",
 )
+
+# Mistari mifupi ya matangazo (≤ 140 herufi) — block hiyo tu inaondolewa, makala inaendelea.
+GLOBAL_PROMO = [
+    r"^\W*bonyeza\b", r"^\W*jiunge\b", r"^\W*fuatilia\b", r"^\W*tufuate\b",
+    r"^\W*follow us\b", r"^\W*subscribe\b", r"whatsapp\s+(channel|group)",
+]
 
 # Maandishi yanayokuwa noise (block nzima ikiwa hivi inaondolewa)
 NOISE_TEXTS = {
@@ -146,4 +155,5 @@ def get_rules(url: str, soup) -> dict:
         "drop_text": list(site.get("drop_text", [])),
         "title": list(site.get("title", [])),
         "images": site.get("images", True),
+        "lead_image": site.get("lead_image", True),
     }
