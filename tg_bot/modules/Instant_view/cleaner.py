@@ -15,17 +15,21 @@ Ili kuruhusu tag mpya: ongeza kwenye WRAP / INLINE_UNWRAP.
 """
 
 import re
+import logging
+import posixpath
 from html import escape, unescape
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from bs4 import NavigableString, Tag
 
-from .sites import NOISE_TEXTS
+from .sites import NOISE_TEXTS, GLOBAL_PROMO
+
+logger = logging.getLogger(__name__)
 
 # ── Tags zinazofutwa pamoja na ndani yake ─────────────────────
 DROP = {
     "script", "style", "noscript", "template", "head", "meta", "link", "title",
-    "nav", "footer", "aside", "header", "form", "button", "input", "select",
+    "nav", "footer", "aside", "button", "input", "select",
     "textarea", "option", "label", "fieldset", "svg", "canvas", "iframe",
     "video", "audio", "source", "track", "object", "embed", "map", "area",
     "dialog", "menu", "hr",
@@ -46,11 +50,40 @@ INLINE_UNWRAP = {
     "bdi", "bdo", "q", "var", "dfn", "wbr", "data", "ruby", "rt", "rp",
 }
 
-INLINE = set(WRAP) | INLINE_UNWRAP | {"a", "br", "img"}
+INLINE = set(WRAP) | INLINE_UNWRAP | {"a", "br", "img", "amp-img"}
 
 HEADINGS = {"h1": "h3", "h2": "h3", "h3": "h3", "h4": "h4", "h5": "h4", "h6": "h4"}
 
-LAZY_ATTRS = ("data-src", "data-lazy-src", "data-original", "data-lazy", "src")
+STOP_MIN_WORDS = 40     # "Soma zaidi" inakata makala tu baada ya maneno haya
+PROMO_MAX_LEN = 140     # matangazo ni mistari mifupi tu
+FORM_MIN_CHARS = 400    # <form> yenye maandishi mengi ni container (mf. ASP.NET), si fomu halisi
+PROMO = [re.compile(p, re.I) for p in GLOBAL_PROMO]
+
+# ═════════ MBINU YA PICHA: mnyororo wa vyanzo (wa kwanza unaofaa unashinda) ═════════
+#  1. attributes za "full/large" (Jetpack/WordPress)
+#  2. srcset / data-srcset  → picha KUBWA kuliko zote
+#  3. attributes za lazy-load (data-src, data-original, ...)
+#  4. src ya kawaida
+#  5. <picture><source>  (bila avif)
+#  6. <noscript><img> iliyo jirani (lazy-load plugins huficha picha halisi hapa)
+#  7. <a href="photo.jpg"> inayozunguka picha ndogo (thumbnail → full-size)
+# Zaidi: background-image (style / data-bg), picha ndani ya <header>, <li>, <table>,
+# na picha ya kichwa (og:image / twitter:image / JSON-LD) kama haipo ndani ya makala.
+FULL_ATTRS = ("data-large-file", "data-full-url")
+SRCSET_ATTRS = ("data-srcset", "data-lazy-srcset", "srcset")
+LAZY_ATTRS = (
+    "data-src", "data-lazy-src", "data-original", "data-lazy", "data-img-src",
+    "data-actualsrc", "data-echo", "data-pagespeed-lazy-src", "data-url", "data-image",
+)
+BG_ATTRS = ("data-bg", "data-bg-src", "data-background", "data-background-image")
+IMG_EXT = re.compile(r"\.(?:jpe?g|png|gif|webp|bmp)(?:$|[?#])", re.I)
+PLACEHOLDER_STEMS = {
+    "placeholder", "blank", "spacer", "transparent", "loading", "loader", "lazy",
+    "lazyload", "pixel", "1x1", "empty", "noimage", "no-image", "grey", "gray",
+}
+BG_SKIP_CLASS = re.compile(r"icon|logo|avatar|sprite|badge|emoji|arrow|bullet", re.I)
+HEADER_SKIP = re.compile(r"logo|avatar|icon|sprite|favicon", re.I)
+BG_URL = re.compile(r"url\(\s*['\"]?([^'\")]+?)['\"]?\s*\)", re.I)
 BAD_IMG = re.compile(
     r"(gravatar\.com|/emoji/|(?:^|/)(?:pixel|spacer|blank|transparent|loading|loader|placeholder)\.(?:gif|png))",
     re.I,
@@ -58,6 +91,45 @@ BAD_IMG = re.compile(
 BAD_LINK = ("javascript:", "mailto:", "tel:", "#", "data:")
 
 ZERO_WIDTH = dict.fromkeys(map(ord, "\u200b\u200c\u200d\ufeff"), None)
+
+
+def _is_small_form(tag) -> bool:
+    """Fomu ndogo (search, comment, newsletter) → futa. Kubwa → ni ukurasa uliofungwa ndani ya form."""
+    return tag.name == "form" and len(tag.get_text(strip=True)) < FORM_MIN_CHARS
+
+
+def _usable(url) -> bool:
+    """URL halisi ya picha (si data:, si placeholder)."""
+    if not url:
+        return False
+    url = str(url).strip()
+    if not url or url.startswith(("data:", "blob:", "javascript:", "about:")):
+        return False
+    stem = posixpath.splitext(posixpath.basename(urlparse(url).path))[0].lower()
+    return stem not in PLACEHOLDER_STEMS
+
+
+def _srcset_best(value) -> str | None:
+    """Picha kubwa kuliko zote kwenye srcset ('url 300w, url2 800w'); inastahimili comma ndani ya URL."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    pairs = [
+        (u, float(n))
+        for u, n in re.findall(r"(\S+?),?\s+(\d+(?:\.\d+)?)[wx]\b", value)
+        if _usable(u)
+    ]
+    if pairs:
+        return max(pairs, key=lambda p: p[1])[0]
+    first = value.split()[0].rstrip(",")
+    return first if _usable(first) else None
+
+
+def img_key(url: str) -> str:
+    """Ufunguo wa kutambua picha ile ile ya ukubwa tofauti (photo-300x200.jpg == photo.jpg)."""
+    p = urlparse(url)
+    path = re.sub(r"(?:-scaled|-\d{2,4}x\d{2,4})+(?=\.\w+$)", "", p.path.lower())
+    return f"{p.netloc.lower()}{path}"
 
 
 class _Stop(Exception):
@@ -127,6 +199,7 @@ class Cleaner:
         images: bool = True,
         stop_at: tuple = (),
         drop_text: list[str] | None = None,
+        lead_image: str | None = None,
     ):
         self.base_url = base_url
         self.title = _norm(title)
@@ -136,6 +209,11 @@ class Cleaner:
         self.out: list[str] = []
         self.seen_texts: set[str] = set()
         self.seen_imgs: set[str] = set()
+        self.words = 0
+        self.lead_image = lead_image
+        self.img_found = 0
+        self.img_unresolved = 0
+        self._li_imgs: list[str] = []
 
     # ═════════════ PUBLIC ═════════════
     def run(self, root: Tag) -> list[str]:
@@ -143,6 +221,20 @@ class Cleaner:
             self._container(root)
         except _Stop:
             pass
+
+        # Picha ya kichwa (og:image n.k.) kama haipo ndani ya makala → iwe ya kwanza
+        if self.images and self.lead_image:
+            stem = posixpath.basename(urlparse(self.lead_image).path)
+            if img_key(self.lead_image) not in self.seen_imgs and not HEADER_SKIP.search(stem):
+                self.seen_imgs.add(img_key(self.lead_image))
+                self.out.insert(0, f'<img src="{escape(self.lead_image)}"/>')
+
+        if self.images:
+            logger.info(
+                "picha: zilizoonekana=%d, hazikupata URL=%d, zilizowekwa=%d",
+                self.img_found, self.img_unresolved,
+                sum(1 for b in self.out if b.startswith("<img")),
+            )
         return self.out
 
     # ═════════════ BLOCK LEVEL ═════════════
@@ -157,7 +249,19 @@ class Cleaner:
             if not isinstance(child, Tag):
                 continue
             name = (child.name or "").lower()
-            if name in DROP:
+            if name in DROP or _is_small_form(child):
+                continue
+            if name == "header":
+                # maandishi ya <header> (title/meta) yanaondolewa, lakini picha zake zinabaki
+                self._flush("p", buf)
+                buf = []
+                self._header_images(child)
+                continue
+            bg = self._bg_url(child)
+            if bg:
+                self._flush("p", buf)
+                buf = []
+                self._emit_img(bg)
                 continue
             if name in INLINE:
                 buf.extend(self._inline(child))
@@ -201,9 +305,9 @@ class Cleaner:
 
     def _inline(self, node: Tag) -> list[tuple]:
         name = (node.name or "").lower()
-        if name in DROP:
+        if name in DROP or name == "header" or _is_small_form(node):
             return []
-        if name == "img":
+        if name in ("img", "amp-img"):
             return self._img(node)
         if name == "br":
             return [("br",)]
@@ -232,42 +336,107 @@ class Cleaner:
     def _img(self, node: Tag) -> list[tuple]:
         # emoji ya WordPress ni <img> lakini ni maandishi — ibaki hata kwa text-only
         classes = " ".join(node.get("class") or [])
-        if "emoji" in classes.split() or "emoji" in classes:
+        if "emoji" in classes:
             alt = (node.get("alt") or "").strip()
             return [("t", _esc(alt))] if alt else []
         if not self.images:
             return []
 
-        src = ""
-        for attr in LAZY_ATTRS:
-            val = (node.get(attr) or "").strip()
-            if val and not val.startswith("data:"):
-                src = val
-                break
-        if not src:
-            srcset = (node.get("data-srcset") or node.get("srcset") or "").strip()
-            if srcset:
-                src = srcset.split(",")[-1].strip().split(" ")[0]
-        if not src:
-            return []
-
+        self.img_found += 1
         for dim in ("width", "height"):
             raw = str(node.get(dim) or "").strip()
             if raw.isdigit() and int(raw) <= 50:
                 return []
 
-        src = urljoin(self.base_url, src)
-        low = src.lower().split("?")[0]
-        if (
-            not src.lower().startswith(("http://", "https://"))
-            or low.endswith(".svg")
-            or BAD_IMG.search(src)
-            or src in self.seen_imgs
-        ):
+        src = self._resolve(node)
+        if not src:
+            self.img_unresolved += 1
+            logger.info("picha bila URL inayoeleweka: %s", str(node)[:200])
             return []
+        return self._img_token(src)
 
-        self.seen_imgs.add(src)
+    def _img_token(self, src: str) -> list[tuple]:
+        low = src.lower().split("?")[0]
+        if low.endswith(".svg") or BAD_IMG.search(src):
+            return []
+        key = img_key(src)
+        if key in self.seen_imgs:
+            return []
+        self.seen_imgs.add(key)
         return [("img", f'<img src="{escape(src)}"/>')]
+
+    def _emit_img(self, src: str) -> None:
+        for tok in self._img_token(src):
+            self.out.append(tok[1])
+
+    def _resolve(self, node: Tag) -> str | None:
+        """Mnyororo wa vyanzo — chagua URL bora ya picha (angalia maelezo juu ya faili)."""
+        cands: list = [node.get(a) for a in FULL_ATTRS]
+        cands += [_srcset_best(node.get(a)) for a in SRCSET_ATTRS]
+        cands += [node.get(a) for a in LAZY_ATTRS]
+        cands.append(node.get("src"))
+
+        parent = node.parent
+        if parent is not None and parent.name == "picture":
+            for source in parent.find_all("source"):
+                if "avif" in (source.get("type") or "").lower():
+                    continue
+                cands.append(_srcset_best(source.get("data-srcset") or source.get("srcset")))
+
+        ns = node.find_next_sibling("noscript")
+        if ns is not None:
+            inner = ns.find("img")
+            if inner is not None:
+                cands.append(inner.get("src"))
+
+        chosen = next((str(c).strip() for c in cands if _usable(c)), None)
+        anchor = node.find_parent("a")
+        anchor_href = None
+        if anchor is not None and anchor.get("href"):
+            href = urljoin(self.base_url, anchor["href"].strip())
+            if IMG_EXT.search(href):
+                anchor_href = href
+
+        if chosen is None:
+            chosen = anchor_href
+        if chosen is None:
+            return None
+        absolute = urljoin(self.base_url, chosen)
+
+        # picha ndogo (thumbnail) iliyozungukwa na link ya picha kubwa ile ile → tumia kubwa
+        if anchor_href and anchor_href != absolute and img_key(anchor_href) == img_key(absolute):
+            absolute = anchor_href
+
+        return absolute if absolute.lower().startswith(("http://", "https://")) else None
+
+    def _bg_url(self, node: Tag) -> str | None:
+        """Picha ya background (style/data-bg) kwenye element isiyo na maandishi wala <img>."""
+        if not self.images:
+            return None
+        style = node.get("style") or ""
+        data_bg = next((node.get(a) for a in BG_ATTRS if node.get(a)), None)
+        if "url(" not in style and not data_bg:
+            return None
+        if BG_SKIP_CLASS.search(" ".join(node.get("class") or [])):
+            return None
+        if node.get_text(strip=True) or node.find(["img", "amp-img", "picture"]):
+            return None
+        url = data_bg
+        if not url:
+            m = BG_URL.search(style)
+            url = m.group(1) if m else None
+        if not _usable(url):
+            return None
+        url = urljoin(self.base_url, url.strip())
+        return url if url.lower().startswith(("http://", "https://")) else None
+
+    def _header_images(self, node: Tag) -> None:
+        for img in node.find_all(["img", "amp-img"]):
+            src = self._resolve(img) if self.images else None
+            if src and HEADER_SKIP.search(posixpath.basename(urlparse(src).path)):
+                continue  # logo/avatar ya tovuti, si picha ya makala
+            for tok in self._img(img):
+                self.out.append(tok[1])
 
     # ═════════════ EMIT ═════════════
     def _flush(self, tag: str, tokens: list[tuple]) -> None:
@@ -297,9 +466,18 @@ class Cleaner:
         if low in NOISE_TEXTS:
             return
 
-        # "Soma zaidi", "Bonyeza", "ZILIZOPENDEKEZWA" → kata makala hapa
-        if len(plain) <= 80 and any(w in low for w in self.stop_at):
-            raise _Stop
+        # "Soma zaidi", "ZILIZOPENDEKEZWA" → kata makala hapa (ikiwa tayari tuna maneno ya kutosha;
+        # vinginevyo ni mstari wa juu tu — uondoe na uendelee)
+        if len(plain) <= 80:
+            head = re.sub(r"^\W+", "", low)
+            if any(head.startswith(w) for w in self.stop_at):
+                if self.words >= STOP_MIN_WORDS:
+                    raise _Stop
+                return
+
+        # Mistari mifupi ya matangazo ("Bonyeza hapa kujiunga...") → ondoa block hiyo tu
+        if len(plain) <= PROMO_MAX_LEN and any(p.search(plain) for p in PROMO):
+            return
 
         if any(p.search(plain) for p in self.drop_text):
             return
@@ -316,18 +494,24 @@ class Cleaner:
             return
         self.seen_texts.add(low)
 
+        self.words += len(plain.split())
         self.out.append(f"<{tag}>{html}</{tag}>")
 
     # ═════════════ LISTS ═════════════
     def _list(self, node: Tag, name: str) -> None:
+        self._li_imgs = []
         items = self._list_items(node)
+        imgs, self._li_imgs = self._li_imgs, []
         if not items:
+            self.out.extend(imgs)
             return
         joined = "".join(items)
         # Orodha ya links tu (menu, related posts) → futa
         if len(items) >= 3 and _link_ratio(joined) >= 0.8:
             return
+        self.words += len(_visible(joined).split())
         self.out.append(f"<{name}>{joined}</{name}>")
+        self.out.extend(imgs)  # picha za ndani ya <li> zinakuja baada ya orodha
 
     def _list_items(self, node: Tag) -> list[str]:
         items: list[str] = []
@@ -338,7 +522,9 @@ class Cleaner:
             if cname in DROP:
                 continue
             if cname == "li":
-                tokens = [t for t in self._children(child, skip={"ul", "ol", "li"}) if t[0] != "img"]
+                all_tokens = self._children(child, skip={"ul", "ol", "li"})
+                self._li_imgs.extend(t[1] for t in all_tokens if t[0] == "img")
+                tokens = [t for t in all_tokens if t[0] != "img"]
                 s = _trim("".join(t[1] if t[0] == "t" else "<br/>" for t in tokens))
                 plain = _visible(s)
                 if plain and _norm(plain) not in NOISE_TEXTS and not any(
@@ -367,6 +553,10 @@ class Cleaner:
 
         category = None
         for cells in cells_per_row:
+            for cell in cells:
+                for img in cell.find_all(["img", "amp-img"]):
+                    for tok in self._img(img):
+                        self.out.append(tok[1])
             texts = [_collapse(c.get_text(" ", strip=True)).strip() for c in cells]
             texts = [t for t in texts if t]
             if not texts:
@@ -392,6 +582,7 @@ class Cleaner:
 
     def _raw(self, tag: str, html: str) -> None:
         if _visible(html) and _norm(_visible(html)) not in NOISE_TEXTS:
+            self.words += len(_visible(html).split())
             self.out.append(f"<{tag}>{html}</{tag}>")
 
 
