@@ -6,19 +6,15 @@ extractor.py — kuchukua ukurasa, kutafuta makala, kuisafisha.
 Hatua: fetch → title → tafuta content (selectors za site) → futa uchafu → Cleaner.
 """
 
-import re
-import json
 import asyncio
 import logging
-from html import escape
-from urllib.parse import urljoin
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 import httpx
 from bs4 import BeautifulSoup
 
 from .cleaner import Cleaner
-from .sites import get_rules
+from .sites import get_rules, MIN_ROOT_CHARS
 
 logger = logging.getLogger(__name__)
 
@@ -142,224 +138,52 @@ def _tidy_title(title: str) -> str:
     return " ".join(title.split("|")[0].split()) or "Habari"
 
 
-# Kiwango cha maneno
-GOOD_WORDS = 120   # makala yenye maneno haya au zaidi ni nzuri — acha kutafuta
-MIN_WORDS = 80     # chini ya haya → jaribu njia za akiba (JSON-LD, AMP, ukurasa mzima)
-MIN_CANDIDATE_CHARS = 100
-MAX_CANDIDATES = 6
-GUARD_RATIO = 0.4  # selector ya kufuta isifute kipande chenye > 40% ya maandishi ya makala
-
-
-def _words(blocks: list[str]) -> int:
-    return sum(
-        len(re.sub(r"<[^>]+>", " ", b).split())
-        for b in blocks
-        if not b.startswith("<img")
-    )
-
-
-def find_candidates(soup: BeautifulSoup, selectors: list[str]) -> list:
-    """Vyombo vya makala kwa mpangilio wa kipaumbele (bila kurudia)."""
-    found, seen = [], set()
+def find_content(soup: BeautifulSoup, selectors: list[str]):
+    """Selector ya kwanza yenye maandishi ya kutosha; la sivyo kubwa kuliko zote."""
+    best, best_len = None, 0
     for sel in selectors:
         try:
-            matches = soup.select(sel)[:3]
+            found = soup.select(sel)[:3]
         except Exception:
             logger.warning("Selector batili: %s", sel)
             continue
-        for el in matches:
-            if id(el) in seen:
-                continue
-            if len(el.get_text(" ", strip=True)) >= MIN_CANDIDATE_CHARS:
-                seen.add(id(el))
-                found.append(el)
-        if len(found) >= MAX_CANDIDATES:
-            break
-    return found
+        for el in found:
+            n = len(el.get_text(" ", strip=True))
+            if n >= MIN_ROOT_CHARS:
+                return el
+            if n > best_len:
+                best, best_len = el, n
+    return best or soup.body or soup
 
 
 def prune(root, selectors: list[str]) -> None:
-    """Futa uchafu ndani ya root. Kipande chenye sehemu kubwa ya makala hakifutwi
-    (selector pana kama [class*='share-'] isifute makala nzima kimakosa)."""
-    root_len = len(root.get_text(" ", strip=True))
     for sel in selectors:
         try:
             for el in root.select(sel):
-                if el is root or el.decomposed:
-                    continue
-                if root_len > 500 and len(el.get_text(" ", strip=True)) > GUARD_RATIO * root_len:
-                    continue
-                el.decompose()
+                if el is not root and not el.decomposed:
+                    el.decompose()
         except Exception:
             logger.warning("Selector ya kufuta batili: %s", sel)
 
 
-def _clean(root, url: str, title: str, images: bool, rules: dict, lead: str | None = None) -> list[str]:
-    return Cleaner(
+async def extract(url: str, images: bool = True) -> tuple[str, list[str]]:
+    url = clean_url(url)
+    content = await fetch(url)
+    soup = BeautifulSoup(content, "html.parser")
+
+    rules = get_rules(url, soup)
+    title = get_title(soup, rules)
+
+    root = find_content(soup, rules["content"])
+    prune(root, rules["remove"])
+
+    blocks = Cleaner(
         base_url=url,
         title=title,
         images=images and rules["images"],
         stop_at=rules["stop_at"],
         drop_text=rules["drop_text"],
-        lead_image=lead,
     ).run(root)
-
-
-def best_blocks(soup, url: str, title: str, images: bool, rules: dict, lead: str | None = None) -> list[str]:
-    """Jaribu vyombo kwa mpangilio; kipaumbele kwa cha kwanza, lakini kikiwa na maneno
-    machache chukua kinachofuata kikiwa na angalau mara 2 ya maneno."""
-    best: list[str] = []
-    best_w = 0
-    for i, root in enumerate(find_candidates(soup, rules["content"])):
-        prune(root, rules["remove"])
-        blocks = _clean(root, url, title, images, rules, lead)
-        w = _words(blocks)
-        if i == 0 or w >= 2 * best_w:
-            best, best_w = blocks, w
-        if best_w >= GOOD_WORDS:
-            break
-    return best
-
-
-# ── Njia za akiba ──────────────────────────────────────────────
-def _find_key(data, key: str):
-    """Tafuta thamani ya key (mf. articleBody) ndani ya JSON-LD yoyote (nested/list/@graph)."""
-    if isinstance(data, dict):
-        if isinstance(data.get(key), str) and data[key].strip():
-            return data[key]
-        for v in data.values():
-            r = _find_key(v, key)
-            if r:
-                return r
-    elif isinstance(data, list):
-        for v in data:
-            r = _find_key(v, key)
-            if r:
-                return r
-    return None
-
-
-def jsonld_blocks(soup: BeautifulSoup) -> list[str]:
-    """Tovuti nyingi huweka makala kamili ndani ya <script type="application/ld+json"> (articleBody)."""
-    for tag in soup.find_all("script", type="application/ld+json"):
-        try:
-            data = json.loads(tag.string or tag.get_text() or "")
-        except Exception:
-            continue
-        body = _find_key(data, "articleBody")
-        if body:
-            body = re.sub(r"<br\s*/?>|</p>", "\n", body, flags=re.I)
-            body = re.sub(r"<[^>]+>", "", body)
-            paras = [" ".join(p.split()) for p in re.split(r"\n+", body)]
-            return [f"<p>{escape(p, quote=False)}</p>" for p in paras if p]
-    return []
-
-
-def _as_url(value) -> str | None:
-    if isinstance(value, str):
-        return value.strip() or None
-    if isinstance(value, dict):
-        return _as_url(value.get("url") or value.get("contentUrl"))
-    if isinstance(value, list):
-        for v in value:
-            r = _as_url(v)
-            if r:
-                return r
-    return None
-
-
-def _ld_image(data) -> str | None:
-    if isinstance(data, dict):
-        r = _as_url(data.get("image")) or _as_url(data.get("thumbnailUrl"))
-        if r:
-            return r
-        for v in data.values():
-            r = _ld_image(v)
-            if r:
-                return r
-    elif isinstance(data, list):
-        for v in data:
-            r = _ld_image(v)
-            if r:
-                return r
-    return None
-
-
-def lead_image(soup: BeautifulSoup, url: str, rules: dict) -> str | None:
-    """Picha kuu ya makala (mara nyingi iko nje ya mwili wa makala): og:image → twitter:image → JSON-LD."""
-    if not rules.get("lead_image", True):
-        return None
-    for attrs in (
-        {"property": "og:image"}, {"property": "og:image:secure_url"},
-        {"name": "twitter:image"}, {"property": "twitter:image"}, {"name": "twitter:image:src"},
-    ):
-        tag = soup.find("meta", attrs=attrs)
-        if tag and tag.get("content", "").strip():
-            return urljoin(url, tag["content"].strip())
-    for tag in soup.find_all("script", type="application/ld+json"):
-        try:
-            found = _ld_image(json.loads(tag.string or tag.get_text() or ""))
-        except Exception:
-            continue
-        if found:
-            return urljoin(url, found)
-    link = soup.find("link", rel="image_src")
-    if link and link.get("href"):
-        return urljoin(url, link["href"])
-    return None
-
-
-def amp_url(soup: BeautifulSoup, url: str) -> str | None:
-    link = soup.find("link", rel="amphtml")
-    if link and link.get("href"):
-        amp = urljoin(url, link["href"])
-        if amp != url:
-            return amp
-    return None
-
-
-async def extract(url: str, images: bool = True) -> tuple[str, list[str]]:
-    url = clean_url(url)
-    soup = BeautifulSoup(await fetch(url), "html.parser")
-
-    rules = get_rules(url, soup)
-    title = get_title(soup, rules)
-
-    # amp link na JSON-LD zinasomwa KABLA ya kufuta chochote kwenye soup
-    amp = amp_url(soup, url)
-    ld_blocks = jsonld_blocks(soup)
-    use_images = images and rules["images"]
-    lead = lead_image(soup, url, rules) if use_images else None
-    if lead and any(w in lead.lower() for w in ("logo", "favicon", "placeholder")):
-        lead = None  # picha ya tovuti nzima, si ya makala
-
-    blocks = best_blocks(soup, url, title, images, rules, lead)
-    words = _words(blocks)
-
-    # 1) JSON-LD articleBody
-    if words < MIN_WORDS and ld_blocks:
-        w = _words(ld_blocks)
-        if w >= max(MIN_WORDS, 1.5 * words):
-            blocks, words = ([f'<img src="{escape(lead)}"/>'] if lead else []) + ld_blocks, w
-
-    # 2) Toleo la AMP (mara nyingi lina maudhui kamili bila JavaScript)
-    if words < MIN_WORDS and amp:
-        try:
-            amp_soup = BeautifulSoup(await fetch(amp), "html.parser")
-            amp_blocks = best_blocks(amp_soup, amp, title, images, rules, lead)
-            w = _words(amp_blocks)
-            if w >= 1.5 * words:
-                blocks, words = amp_blocks, w
-        except Exception as e:
-            logger.info("AMP fallback imeshindwa (%s): %s", amp, e)
-
-    # 3) Ukurasa mzima (body) — kama ni mkubwa kwa angalau mara 2
-    if words < MIN_WORDS and soup.body is not None:
-        prune(soup.body, rules["remove"])
-        body_blocks = _clean(soup.body, url, title, images, rules, lead)
-        w = _words(body_blocks)
-        if w >= 2 * words:
-            blocks, words = body_blocks, w
 
     if not blocks:
         raise ValueError("Sikupata maudhui ya kusoma kwenye link hiyo.")
